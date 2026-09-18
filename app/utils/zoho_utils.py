@@ -1,3 +1,4 @@
+app/utils/zoho_utils.py
 import re
 from typing import Tuple, Optional
 
@@ -12,7 +13,6 @@ def split_name_and_position(full_name: Optional[str]) -> Tuple[str, Optional[str
         return "", None
 
     raw = full_name.strip()
-    # Split on common separators with optional surrounding whitespace
     parts = re.split(r"\s*[-–—|/]\s*", raw, maxsplit=1)
     if len(parts) >= 2:
         name = parts[0].strip()

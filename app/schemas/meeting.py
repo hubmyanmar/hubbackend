@@ -1,43 +1,45 @@
-from pydantic import BaseModel, constr, Field
-from datetime import date, time, datetime
-from typing import Optional
+from pydantic import BaseModel, EmailStr
+from datetime import date, time
+from typing import Optional, List, Dict, Any
 
+class MeetingParticipantSchema(BaseModel):
+    zoho_user_id: Optional[str] = None
+    name: Optional[str] = None
+    email: EmailStr
 
 class MeetingBase(BaseModel):
-    title: constr(max_length=255)
+    title: str
     agenda: Optional[str] = None
     meeting_date: date
     start_time: time
     end_time: time
-    meeting_type: constr(max_length=32)
-    platform: Optional[constr(max_length=100)] = None
-    meeting_link: Optional[constr(max_length=255)] = None
+    meeting_type: str
+    platform: Optional[str] = None
+    meeting_link: Optional[str] = None
     room_id: Optional[int] = None
-    company_name: constr(max_length=255)
-
+    company_name: str
 
 class MeetingCreate(MeetingBase):
-    created_by: int
-
+    participant_emails: Optional[List[str]] = []
+    participants: Optional[List[Dict[str, Any]]] = []
 
 class MeetingUpdate(BaseModel):
-    title: Optional[constr(max_length=255)] = None
+    title: Optional[str] = None
     agenda: Optional[str] = None
     meeting_date: Optional[date] = None
     start_time: Optional[time] = None
     end_time: Optional[time] = None
-    meeting_type: Optional[constr(max_length=32)] = None
-    platform: Optional[constr(max_length=100)] = None
-    meeting_link: Optional[constr(max_length=255)] = None
+    meeting_type: Optional[str] = None
+    platform: Optional[str] = None
+    meeting_link: Optional[str] = None
     room_id: Optional[int] = None
-    company_name: Optional[constr(max_length=255)] = None
-
+    company_name: Optional[str] = None
+    participant_emails: Optional[List[str]] = None
+    participants: Optional[List[Dict[str, Any]]] = None
 
 class MeetingOut(MeetingBase):
     id: int
     created_by: int
-    created_at: datetime
-    updated_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True

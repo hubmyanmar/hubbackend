@@ -1,3 +1,4 @@
+import os
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -12,6 +13,7 @@ router = APIRouter(prefix="/users", tags=["users"])
 @router.get("/", response_model=list[UserOut])
 def read_users(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     return crud_user.get_users(db, skip=skip, limit=limit)
+
 
 @router.put("/profile/image", response_model=UserOut)
 def update_profile_image(

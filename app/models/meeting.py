@@ -12,10 +12,10 @@ from sqlalchemy import (
     func,
 )
 from sqlalchemy.orm import relationship
-from app.db.session import Base
+from app.core.database import Base
 
 
-class MeetingType(enum.Enum):
+class MeetingType(str, enum.Enum):
     online = "online"
     face_to_face = "face to face"
 
@@ -29,7 +29,16 @@ class Meeting(Base):
     meeting_date = Column(Date, nullable=False)
     start_time = Column(Time, nullable=False)
     end_time = Column(Time, nullable=False)
-    meeting_type = Column(SAEnum(MeetingType, name="meeting_type_enum"), nullable=False)
+    
+    meeting_type = Column(
+        SAEnum(
+            MeetingType, 
+            name="meeting_type_enum", 
+            values_callable=lambda obj: [e.value for e in obj]
+        ), 
+        nullable=False
+    )
+    
     platform = Column(String(100), nullable=True)
     meeting_link = Column(String(255), nullable=True)
     room_id = Column(BigInteger, ForeignKey("meeting_rooms.id", ondelete="SET NULL"), nullable=True)
@@ -39,6 +48,9 @@ class Meeting(Base):
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
-    # Optional relationship placeholders — rely on existing meeting_rooms and users models
+    # Relationships
     room = relationship("MeetingRoom", back_populates="meetings", passive_deletes=True, foreign_keys=[room_id])
     creator = relationship("User", back_populates="meetings_created", foreign_keys=[created_by])
+    
+    # Association Table အစား MeetingParticipant Model နှင့် ချိတ်ဆက်ခြင်း
+    participants = relationship("MeetingParticipant", back_populates="meeting", cascade="all, delete-orphan")

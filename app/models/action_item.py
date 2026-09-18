@@ -3,7 +3,7 @@ import enum
 from sqlalchemy import BigInteger, Column, Date, Enum as SAEnum, ForeignKey, String, TIMESTAMP, func
 from sqlalchemy.orm import backref, relationship
 
-from app.db.session import Base
+from app.core.database import Base
 
 
 class ActionItemStatus(enum.Enum):

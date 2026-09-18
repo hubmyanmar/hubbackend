@@ -3,7 +3,8 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sqlalchemy.orm import Session
-from app.core.database import SessionLocal
+# engine နှင့် Base ကိုပါ import လုပ်ပေးပါ
+from app.core.database import SessionLocal, engine, Base 
 from app.models.meeting_room import MeetingRoom
 
 INITIAL_ROOMS = [
@@ -34,7 +35,10 @@ INITIAL_ROOMS = [
 ]
 
 def seed_meeting_rooms(db: Session):
-    print("🌱 Seeding meeting rooms into PostgreSQL...")
+    # Table မရှိသေးပါက အလိုအလျောက် ဖန်တီးပေးမည့် መስလိုင်း
+    Base.metadata.create_all(bind=engine)
+
+    print("🌱 Seeding meeting rooms into database...")
     
     for room_data in INITIAL_ROOMS:
         existing_room = db.query(MeetingRoom).filter(MeetingRoom.name == room_data["name"]).first()
@@ -52,7 +56,7 @@ def seed_meeting_rooms(db: Session):
             print(f" Room already exists: {room_data['name']}")
             
     db.commit()
-    print("✨ Meeting rooms seeding completed successfully!")
+    print(" Meeting rooms seeding completed successfully!")
 
 if __name__ == "__main__":
     db = SessionLocal()

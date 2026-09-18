@@ -4,8 +4,8 @@ from typing import Optional
 
 
 class MeetingParticipantBase(BaseModel):
-    zoho_user_id: constr(max_length=255)
-    name: constr(max_length=255)
+    zoho_user_id: Optional[constr(max_length=255)] = None
+    name: Optional[constr(max_length=255)] = None
     email: EmailStr
     meeting_id: int
 
@@ -19,4 +19,4 @@ class MeetingParticipantOut(MeetingParticipantBase):
     created_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True

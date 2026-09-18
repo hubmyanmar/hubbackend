@@ -174,6 +174,115 @@ def get_allowed_positions() -> list[str]:
 def get_positions():
     return {"positions": get_allowed_positions()}
 
+# Caching အတွက် 
+_users_cache = {
+    "data": [],
+    "last_fetched": 0.0
+}
+def get_company_users_from_zoho() -> list[dict]:
+    try:
+        token = get_zoho_access_token()
+    except Exception as exc:
+        print(f"[Zoho Auth Error]: {exc}")
+        return []
+
+    headers = {"Authorization": f"Zoho-oauthtoken {token}"}
+    users_result = []
+    seen_emails = set()
+
+    url = "https://cliq.zoho.com/api/v2/users"
+    limit = 100
+    next_token = None
+
+    while True:
+        req_url = f"{url}?limit={limit}"
+        if next_token:
+            req_url += f"&next_token={next_token}"
+            
+        try:
+            with httpx.Client(timeout=30.0) as client:
+                response = client.get(req_url, headers=headers)
+
+            if response.status_code != 200:
+                print(f"[Zoho API Error] URL: {req_url} - Status: {response.status_code}")
+                break
+
+            payload = response.json()
+            users_list = []
+            if isinstance(payload, dict):
+                users_list = payload.get("users") or payload.get("data") or []
+            elif isinstance(payload, list):
+                users_list = payload
+
+            if not users_list:
+                break
+
+            for user in users_list:
+                if not isinstance(user, dict):
+                    continue
+
+                display_name = (
+                    user.get("display_name") or 
+                    user.get("displayName") or 
+                    user.get("name") or 
+                    f"{user.get('first_name', '')} {user.get('last_name', '')}".strip()
+                )
+
+                email = (
+                    user.get("email") or 
+                    user.get("email_id") or 
+                    user.get("mail") or 
+                    user.get("user_email")
+                )
+
+                zoho_user_id = user.get("id") or user.get("zuid") or user.get("user_id")
+
+                if display_name:
+                    clean_email = (
+                        email.strip().lower() 
+                        if email and isinstance(email, str) 
+                        else f"{str(zoho_user_id or display_name).lower().replace(' ', '_')}@cliq.user"
+                    )
+                    
+                    if clean_email not in seen_emails:
+                        seen_emails.add(clean_email)
+                        users_result.append({
+                            "zoho_user_id": str(zoho_user_id) if zoho_user_id else "",
+                            "name": str(display_name).strip(),
+                            "email": clean_email
+                        })
+
+            pagination = payload.get("pagination", {})
+            next_token = payload.get("next_token") or pagination.get("next_token") or payload.get("next_set_token")
+            
+            if not next_token or len(users_list) < limit:
+                break
+
+        except Exception as exc:
+            print(f"[Zoho Users Extraction Loop Error]: {exc}")
+            break
+
+    print(f"[DEBUG] Total Unique Users Extracted: {len(users_result)}")
+    return users_result
+
+def get_allowed_users() -> list[dict]:
+    global _users_cache
+    current_time = time.time()
+
+    if current_time - _users_cache["last_fetched"] < CACHE_TTL_SECONDS and _users_cache["data"]:
+        return _users_cache["data"]
+
+    company_users = get_company_users_from_zoho()
+    if company_users:
+        _users_cache["data"] = company_users
+        _users_cache["last_fetched"] = current_time
+
+    return _users_cache["data"]
+
+@router.get("/users")
+def get_zoho_users_list():
+    return get_allowed_users()
+
 
 @router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
 def register_user(payload: RegisterRequest, db: Session = Depends(get_db)):

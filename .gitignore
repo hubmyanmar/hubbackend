@@ -28,3 +28,9 @@ credentials/
 # OS/editor files
 .DS_Store
 Thumbs.db
+
+# requirements.txt
+requirements.txt
+
+# alembic.ini
+alembic.ini

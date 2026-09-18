@@ -6,7 +6,6 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 
-# .env ဖိုင်တွင်းရှိ Variable များကို System Env သို့ Load လုပ်ခြင်း
 load_dotenv()
 
 from app.api.v1.router import api_router
@@ -114,7 +113,6 @@ async def zoho_callback(code: Optional[str] = None):
         }
 
     try:
-        # Callback ချိန်တွင် Refresh Token စစ်ဆေးရန် မလိုပါ (require_refresh_token=False)
         client_id, client_secret, _ = get_zoho_credentials(require_refresh_token=False)
     except RuntimeError as exc:
         return {"status": "error", "message": str(exc)}

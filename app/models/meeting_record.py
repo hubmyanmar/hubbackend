@@ -1,7 +1,7 @@
 from sqlalchemy import BigInteger, Column, ForeignKey, String, Text, TIMESTAMP, func
 from sqlalchemy.orm import backref, relationship
 
-from app.db.session import Base
+from app.core.database import Base
 
 
 class MeetingRecord(Base):
