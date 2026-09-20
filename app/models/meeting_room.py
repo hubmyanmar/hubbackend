@@ -7,7 +7,6 @@ from app.core.database import Base
 class MeetingRoom(Base):
     __tablename__ = "meeting_rooms"
 
-    # BigInteger အစား Integer နှင့် autoincrement=True သို့ ပြောင်းထားပါသည်
     id = Column(Integer, primary_key=True, autoincrement=True, index=True)
     name = Column(String(100), nullable=False)
     capacity = Column(Integer, nullable=False)

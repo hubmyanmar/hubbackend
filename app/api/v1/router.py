@@ -13,5 +13,4 @@ api_router.include_router(users_router)
 api_router.include_router(meeting_rooms.router, prefix="/meeting-rooms", tags=["Meeting Rooms"])
 api_router.include_router(companies.router, prefix="/companies", tags=["Companies"])
 
-# Meetings Router ချိတ်ဆက်ခြင်း
-api_router.include_router(meetings.router, prefix="/meetings", tags=["Meetings"])
+api_router.include_router(meetings.router)

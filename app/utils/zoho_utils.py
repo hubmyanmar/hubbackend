@@ -1,22 +1,37 @@
-app/utils/zoho_utils.py
-import re
-from typing import Tuple, Optional
+# app/utils/zoho_utils.py
+import os
+import httpx
 
+def send_meeting_webhook_notification(meeting_title: str, start_time: str, participants: list):
+    webhook_url = os.getenv("ZOHO_CLIQ_WEBHOOK_URL")
+    if not webhook_url:
+        print("[Webhook Error] ZOHO_CLIQ_WEBHOOK_URL is not set in .env")
+        return
 
-def split_name_and_position(full_name: Optional[str]) -> Tuple[str, Optional[str]]:
-    """Split a display name that may include a trailing ' - position' or similar separator.
+    mention_tags = []
+    for p in participants:
+        email = p.get("email") if isinstance(p, dict) else getattr(p, "email", None)
+        name = p.get("name", "User") if isinstance(p, dict) else getattr(p, "name", "User")
+        
+        if email and "@cliq.user" not in email:
+            mention_tags.append(f"@{email}")
+        else:
+            mention_tags.append(f"@{name}")
 
-    Returns a tuple (name, position) where position is None if not found.
-    Separators considered: hyphen variants, pipe, slash. Splitting is limited to the first separator.
-    """
-    if not full_name:
-        return "", None
+    mentions_str = ", ".join(mention_tags)
+    
+    payload = {
+        "text": f"📅 *New Meeting Booked!*\n\n"
+                f"🔹 *Title:* {meeting_title}\n"
+                f"⏰ *Time:* {start_time}\n"
+                f"👥 *Invited Participants:* {mentions_str}\n\n"
+                f"Please check your schedule and join on time!"
+    }
 
-    raw = full_name.strip()
-    parts = re.split(r"\s*[-–—|/]\s*", raw, maxsplit=1)
-    if len(parts) >= 2:
-        name = parts[0].strip()
-        position = parts[1].strip()
-        return name, position
-
-    return raw, None
+    try:
+        with httpx.Client(timeout=10.0) as client:
+            response = client.post(webhook_url, json=payload)
+            if response.status_code != 200:
+                print(f"[Webhook Failed] Status: {response.status_code}, Response: {response.text}")
+    except Exception as exc:
+        print(f"[Webhook Exception]: {exc}")

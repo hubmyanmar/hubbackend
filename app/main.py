@@ -3,8 +3,9 @@ from typing import Any, Optional
 
 import httpx
 from dotenv import load_dotenv
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 load_dotenv()
 
@@ -12,7 +13,18 @@ from app.api.v1.router import api_router
 
 app = FastAPI(title="Minutemind Backend")
 
-# CORS Configuration
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    return JSONResponse(
+        status_code=500,
+        content={
+            "status": "error",
+            "message": "Internal Server Error",
+            "detail": str(exc),
+        },
+    )
+
+# 2. CORS Configuration
 origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
