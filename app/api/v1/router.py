@@ -14,3 +14,4 @@ api_router.include_router(meeting_rooms.router, prefix="/meeting-rooms", tags=["
 api_router.include_router(companies.router, prefix="/companies", tags=["Companies"])
 
 api_router.include_router(meetings.router)
+# api_router.include_router(meetings.router, prefix="/api/v1")

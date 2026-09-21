@@ -40,7 +40,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# app.include_router(api_router)
 app.include_router(api_router)
+# app.include_router(api_router, prefix="/api/v1")
 
 ZOHO_TOKEN_URL = "https://accounts.zoho.com/oauth/v2/token"
 ZOHO_CRM_LEADS_URL = "https://www.zohoapis.com/crm/v2/Leads"

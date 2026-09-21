@@ -7,6 +7,13 @@ class MeetingParticipantSchema(BaseModel):
     name: Optional[str] = None
     email: EmailStr
 
+class RoomOut(BaseModel):
+    id: int
+    name: str
+
+    class Config:
+        from_attributes = True
+
 class MeetingBase(BaseModel):
     title: str
     agenda: Optional[str] = None
@@ -30,7 +37,6 @@ class MeetingCreate(MeetingBase):
     participant_emails: Optional[List[str]] = []
     participants: Optional[List[MeetingParticipantSchema]] = []
 
-    # Zoho Cliq အတွက် လိုအပ်သော field များ
     inviteCliq: Optional[bool] = False
     invite_cliq: Optional[bool] = False
 
@@ -56,7 +62,10 @@ class MeetingUpdate(BaseModel):
 
 class MeetingOut(MeetingBase):
     id: int
-    created_by: int
+    created_by: Optional[int] = None
+    
+    room: Optional[RoomOut] = None
+    participants: List[MeetingParticipantSchema] = []
 
     class Config:
         from_attributes = True

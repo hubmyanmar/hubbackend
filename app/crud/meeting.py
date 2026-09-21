@@ -1,7 +1,7 @@
 # app/crud/meeting.py
 from datetime import date, time
 from typing import Optional, Union
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from fastapi import HTTPException, status
 
 from app.models.meeting import Meeting
@@ -87,7 +87,11 @@ def list_meetings(
     date_filter: Optional[Union[date, str]] = None,
     meeting_date: Optional[Union[date, str]] = None
 ):
-    query = db.query(Meeting)
+    query = db.query(Meeting).options(
+        joinedload(Meeting.room),
+        joinedload(Meeting.participants)
+    )
+    
     target_date = date_filter or meeting_date
     if target_date:
         query = query.filter(Meeting.meeting_date == target_date)
@@ -96,7 +100,10 @@ def list_meetings(
 
 
 def get_meeting(db: Session, meeting_id: int) -> Optional[Meeting]:
-    return db.query(Meeting).filter(Meeting.id == meeting_id).first()
+    return db.query(Meeting).options(
+        joinedload(Meeting.room),
+        joinedload(Meeting.participants)
+    ).filter(Meeting.id == meeting_id).first()
 
 
 def update_meeting(db: Session, db_obj: Meeting, updates: MeetingUpdate) -> Meeting:
