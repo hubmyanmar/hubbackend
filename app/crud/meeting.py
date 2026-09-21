@@ -1,5 +1,6 @@
+# app/crud/meeting.py
 from datetime import date, time
-from typing import Optional
+from typing import Optional, Union
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 
@@ -33,15 +34,15 @@ def check_room_conflict(
 
 
 def create_meeting(db: Session, meeting_in: MeetingCreate) -> Meeting:
-    exclude_fields = {"participant_emails"}
+    exclude_fields = {"participant_emails", "inviteCliq", "invite_cliq"}
     if hasattr(meeting_in, "participants"):
         exclude_fields.add("participants")
 
     meeting_data = meeting_in.model_dump(exclude=exclude_fields)
     db_meeting = Meeting(**meeting_data)
+    
     db.add(db_meeting)
-    db.commit()
-    db.refresh(db_meeting)
+    db.flush() 
 
     if hasattr(meeting_in, "participant_emails") and meeting_in.participant_emails:
         for email in meeting_in.participant_emails:
@@ -58,9 +59,8 @@ def create_meeting(db: Session, meeting_in: MeetingCreate) -> Meeting:
             p_email = p.get("email") if isinstance(p, dict) else getattr(p, "email", None)
             p_name = p.get("name") if isinstance(p, dict) else getattr(p, "name", "")
             p_zoho_id = p.get("zoho_user_id") if isinstance(p, dict) else getattr(p, "zoho_user_id", None)
-
             if not p_zoho_id or str(p_zoho_id).strip() == "":
-                db.rollback()
+                db.rollback() 
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="zoho_user_id cannot be blank for participants."
@@ -79,22 +79,23 @@ def create_meeting(db: Session, meeting_in: MeetingCreate) -> Meeting:
     db.refresh(db_meeting)
     return db_meeting
 
+
 def list_meetings(
     db: Session, 
     skip: int = 0, 
     limit: int = 100, 
-    date: Optional[str] = None,
-    meeting_date: Optional[str] = None
+    date_filter: Optional[Union[date, str]] = None,
+    meeting_date: Optional[Union[date, str]] = None
 ):
     query = db.query(Meeting)
-    target_date = date or meeting_date
+    target_date = date_filter or meeting_date
     if target_date:
         query = query.filter(Meeting.meeting_date == target_date)
 
     return query.offset(skip).limit(limit).all()
 
 
-def get_meeting(db: Session, meeting_id: int):
+def get_meeting(db: Session, meeting_id: int) -> Optional[Meeting]:
     return db.query(Meeting).filter(Meeting.id == meeting_id).first()
 
 
@@ -109,6 +110,6 @@ def update_meeting(db: Session, db_obj: Meeting, updates: MeetingUpdate) -> Meet
     return db_obj
 
 
-def delete_meeting(db: Session, db_obj: Meeting):
+def delete_meeting(db: Session, db_obj: Meeting) -> None:
     db.delete(db_obj)
     db.commit()

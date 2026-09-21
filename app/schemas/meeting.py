@@ -30,6 +30,13 @@ class MeetingCreate(MeetingBase):
     participant_emails: Optional[List[str]] = []
     participants: Optional[List[MeetingParticipantSchema]] = []
 
+    # Zoho Cliq အတွက် လိုအပ်သော field များ
+    inviteCliq: Optional[bool] = False
+    invite_cliq: Optional[bool] = False
+
+    class Config:
+        extra = "ignore"
+
 class MeetingUpdate(BaseModel):
     title: Optional[str] = None
     agenda: Optional[str] = None
@@ -44,9 +51,13 @@ class MeetingUpdate(BaseModel):
     participant_emails: Optional[List[str]] = None
     participants: Optional[List[Dict[str, Any]]] = None
 
+    class Config:
+        extra = "ignore"
+
 class MeetingOut(MeetingBase):
     id: int
     created_by: int
 
     class Config:
         from_attributes = True
+        extra = "ignore"

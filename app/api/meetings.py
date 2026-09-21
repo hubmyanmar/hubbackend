@@ -75,7 +75,9 @@ def create_meeting(
             send_meeting_webhook_notification,
             meeting_title=getattr(db_obj, "title", "Meeting"),
             start_time=time_str or str(start_time_val),
-            participants=participants
+            participants=participants,
+            meeting_room=getattr(db_obj, "room", getattr(db_obj, "meeting_room", "")),
+            meeting_id=str(getattr(db_obj, "id", ""))
         )
 
     return db_obj
