@@ -91,7 +91,7 @@ def sync_from_zoho(meeting_id: int, db: Session = Depends(get_db)):
 
             # Clean name and optionally extract position using a helper
             try:
-                from app.utils.zoho_utils import split_name_and_position
+                from app.utils.zoho_sync import split_name_and_position
                 clean_name, _position = split_name_and_position(name)
             except Exception:
                 # Fallback: simple split on ' - '

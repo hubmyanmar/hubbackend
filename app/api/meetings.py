@@ -9,7 +9,8 @@ from app import models
 from app.crud import meeting as meeting_crud
 from app.db.session import get_db
 from app.schemas import meeting as meeting_schemas
-from app.utils.zoho_utils import send_meeting_webhook_notification
+# from app.utils.zoho_utils import send_meeting_webhook_notification
+from app.utils.zoho_sync import send_zoho_notification
 
 router = APIRouter(prefix="/meetings", tags=["meetings"])
 
@@ -69,12 +70,14 @@ def create_meeting(
         
         meeting_date = getattr(db_obj, "meeting_date", "")
         start_time_val = getattr(db_obj, "start_time", "")
+        end_time_val = getattr(db_obj, "end_time", "")  # <--- end_time ကိုပါ ထည့်ယူရန်
         time_str = f"{meeting_date} {start_time_val}".strip()
 
         background_tasks.add_task(
-            send_meeting_webhook_notification,
+            send_zoho_notification,
             meeting_title=getattr(db_obj, "title", "Meeting"),
             start_time=time_str or str(start_time_val),
+            end_time=str(end_time_val),                  # <--- ပေးပို့ရန် ထည့်သွင်းခြင်း
             participants=participants,
             meeting_room=getattr(db_obj, "room", getattr(db_obj, "meeting_room", "")),
             meeting_id=str(getattr(db_obj, "id", ""))
