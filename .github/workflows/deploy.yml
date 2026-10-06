@@ -18,19 +18,20 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            if [ ! -d "/home/ubuntu/hubbackend" ]; then
-              git clone https://github.com/hubmyanmar/hubbackend.git /home/ubuntu/hubbackend
-            fi
-
             cd /home/ubuntu/hubbackend
             git pull origin main
 
-            # Virtual environment (venv)
+            # Virtual environment (venv) မရှိသေးပါက တည်ဆောက်ခြင်း
             if [ ! -d "venv" ]; then
               python3 -m venv venv
             fi
+
+            # Package များ install လုပ်ခြင်း
             source venv/bin/activate
             if [ -f "requirements.txt" ]; then
               pip install --upgrade pip
               pip install -r requirements.txt
             fi
+
+            # PM2 ဖြင့် Python app ကို စတင် run/restart လုပ်ခြင်း
+            pm2 restart backend || pm2 start main.py --name "backend" --interpreter python3
