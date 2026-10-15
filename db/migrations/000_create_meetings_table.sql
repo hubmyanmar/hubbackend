@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS meetings (
     meeting_link VARCHAR(500),
     room_id INTEGER,
     company_name VARCHAR(255),
+    status VARCHAR(32) NOT NULL DEFAULT 'scheduled',
     created_by INTEGER,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

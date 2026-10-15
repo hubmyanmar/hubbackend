@@ -25,6 +25,7 @@ class MeetingBase(BaseModel):
     meeting_link: Optional[str] = None
     room_id: Optional[int] = None
     company_name: str
+    status: str = "scheduled"
 
     @field_validator('meeting_type', mode='before')
     def normalize_meeting_type(cls, v: str) -> str:
@@ -54,6 +55,7 @@ class MeetingUpdate(BaseModel):
     meeting_link: Optional[str] = None
     room_id: Optional[int] = None
     company_name: Optional[str] = None
+    status: Optional[str] = None
     participant_emails: Optional[List[str]] = None
     participants: Optional[List[Dict[str, Any]]] = None
 

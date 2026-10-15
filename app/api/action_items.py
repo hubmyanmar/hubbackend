@@ -1,6 +1,7 @@
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.crud import action_item as action_crud
@@ -12,7 +13,7 @@ router = APIRouter(prefix="/action-items", tags=["action_items"])
 
 @router.post("/", response_model=action_schemas.ActionItemOut, status_code=status.HTTP_201_CREATED)
 def create_action_item(payload: action_schemas.ActionItemCreate, db: Session = Depends(get_db)):
-    meeting = db.execute("SELECT 1 FROM meetings WHERE id = :id", {"id": payload.meeting_id}).first()
+    meeting = db.execute(text("SELECT 1 FROM meetings WHERE id = :id"), {"id": payload.meeting_id}).first()
     if meeting is None:
         raise HTTPException(status_code=400, detail="meeting_id not found")
     return action_crud.create_action_item(db=db, payload=payload)
@@ -25,7 +26,7 @@ def read_action_items(skip: int = 0, limit: int = 100, db: Session = Depends(get
 
 @router.get("/meetings/{meeting_id}", response_model=List[action_schemas.ActionItemOut])
 def read_action_items_by_meeting(meeting_id: int, db: Session = Depends(get_db)):
-    meeting = db.execute("SELECT 1 FROM meetings WHERE id = :id", {"id": meeting_id}).first()
+    meeting = db.execute(text("SELECT 1 FROM meetings WHERE id = :id"), {"id": meeting_id}).first()
     if meeting is None:
         raise HTTPException(status_code=404, detail="Meeting not found")
     return action_crud.list_action_items_by_meeting(db=db, meeting_id=meeting_id)

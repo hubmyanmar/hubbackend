@@ -113,6 +113,7 @@ def read_meeting(meeting_id: int, db: Session = Depends(get_db)):
 
 
 @router.put("/{meeting_id}", response_model=meeting_schemas.MeetingOut)
+@router.patch("/{meeting_id}", response_model=meeting_schemas.MeetingOut)
 def update_meeting(meeting_id: int, updates: meeting_schemas.MeetingUpdate, db: Session = Depends(get_db)):
     db_obj = meeting_crud.get_meeting(db=db, meeting_id=meeting_id)
     if not db_obj:
