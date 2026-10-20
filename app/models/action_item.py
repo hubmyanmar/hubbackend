@@ -9,6 +9,7 @@ from app.core.database import Base
 class ActionItemStatus(enum.Enum):
     to_do = "to_do"
     in_progress = "in_progress"
+    under_review = "under_review"
     complete = "complete"
 
 
