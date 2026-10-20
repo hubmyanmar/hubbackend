@@ -20,6 +20,7 @@ class ActionItem(Base):
     task = Column(String(255), nullable=False)
     owner_name = Column(String(255), nullable=False)
     due_date = Column(Date, nullable=True)
+    priority = Column(String(16), nullable=False, default="Medium", server_default="Medium")
     status = Column(SAEnum(ActionItemStatus, name="action_item_status"), nullable=False, default=ActionItemStatus.to_do)
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
