@@ -11,16 +11,16 @@ router = APIRouter(prefix="/meeting-sessions", tags=["meeting-sessions"])
 def get_all_meeting_sessions(db: Session = Depends(get_db)):
     try:
         sessions_result = db.execute(
-            text("SELECT id, status, actual_started_at, actual_ended_at, actual_duration FROM meetings")
+            text("SELECT id, status FROM meetings")
         ).fetchall()
         
         sessions_dict = {}
         for row in sessions_result:
             sessions_dict[str(row.id)] = {
                 "status": getattr(row, "status", "idle") or "idle",
-                "actual_started_at": str(getattr(row, "actual_started_at", "")) if getattr(row, "actual_started_at", None) else None,
-                "actual_ended_at": str(getattr(row, "actual_ended_at", "")) if getattr(row, "actual_ended_at", None) else None,
-                "actual_duration": getattr(row, "actual_duration", 0) or 0
+                "actual_started_at": None,
+                "actual_ended_at": None,
+                "actual_duration": 0
             }
         return sessions_dict
     except Exception as exc:
