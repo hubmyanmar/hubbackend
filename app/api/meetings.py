@@ -70,14 +70,14 @@ def create_meeting(
         
         meeting_date = getattr(db_obj, "meeting_date", "")
         start_time_val = getattr(db_obj, "start_time", "")
-        end_time_val = getattr(db_obj, "end_time", "")  # <--- end_time ကိုပါ ထည့်ယူရန်
+        end_time_val = getattr(db_obj, "end_time", "")
         time_str = f"{meeting_date} {start_time_val}".strip()
 
         background_tasks.add_task(
             send_zoho_notification,
             meeting_title=getattr(db_obj, "title", "Meeting"),
             start_time=time_str or str(start_time_val),
-            end_time=str(end_time_val),                  # <--- ပေးပို့ရန် ထည့်သွင်းခြင်း
+            end_time=str(end_time_val),
             participants=participants,
             meeting_room=getattr(db_obj, "room", getattr(db_obj, "meeting_room", "")),
             meeting_id=str(getattr(db_obj, "id", ""))
@@ -90,13 +90,13 @@ def create_meeting(
 def read_meetings(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
-    date: Optional[str] = Query(None, alias="date", description="Filter meetings by date (YYYY-MM-DD)"),
+    date: Optional[date] = Query(None, alias="date", description="Filter meetings by date (YYYY-MM-DD)"),
     db: Session = Depends(get_db)
 ):
     try:
-        return meeting_crud.list_meetings(db=db, skip=skip, limit=limit, date=date)
-    except TypeError:
-        return meeting_crud.list_meetings(db=db, skip=skip, limit=limit)
+        return meeting_crud.list_meetings(
+            db=db, skip=skip, limit=limit, date_filter=date
+        )
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

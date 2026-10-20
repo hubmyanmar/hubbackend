@@ -3,7 +3,6 @@ from typing import Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import text
-from datetime import datetime
 from app.db.session import get_db
 
 router = APIRouter(prefix="/meeting-sessions", tags=["meeting-sessions"])
@@ -39,61 +38,24 @@ def update_meeting_session_status(
     if new_status not in ["running", "stopped", "idle"]:
         raise HTTPException(status_code=400, detail="Invalid status value")
     
-    now = datetime.now()
-    
     try:
         existing = db.execute(
-            text("SELECT id, actual_started_at FROM meetings WHERE id = :meeting_id OR CAST(id AS CHAR) = :meeting_id_str"),
-            {"meeting_id": meeting_id, "meeting_id_str": str(meeting_id)}
+            text("SELECT id FROM meetings WHERE id = :meeting_id"),
+            {"meeting_id": int(meeting_id)}
         ).fetchone()
+    except Exception as exc:
+        db.rollback()
+        print(f"❌ Failed to update status for ID {meeting_id}: {str(exc)}")
+        raise HTTPException(status_code=500, detail=f"Failed to update meeting status: {str(exc)}")
 
-        if not existing:
-            db.execute(
-                text("INSERT INTO meetings (id, status, actual_started_at) VALUES (:meeting_id, :status, :now) ON DUPLICATE KEY UPDATE status = :status"),
-                {"meeting_id": meeting_id, "status": new_status, "now": now}
-            )
-            db.commit()
-            return {"message": "Meeting created and status updated", "meeting_id": meeting_id, "status": new_status}
+    if not existing:
+        raise HTTPException(status_code=404, detail="Meeting not found")
 
-        if new_status == "running":
-            db.execute(
-                text("UPDATE meetings SET status = :status, actual_started_at = :now WHERE id = :meeting_id OR CAST(id AS CHAR) = :meeting_id_str"),
-                {"status": new_status, "now": now, "meeting_id": meeting_id, "meeting_id_str": str(meeting_id)}
-            )
-        elif new_status == "stopped":
-            start_dt = existing.actual_started_at
-            actual_duration = 0
-            if start_dt:
-                if start_dt.tzinfo is not None:
-                    start_dt = start_dt.replace(tzinfo=None)
-                
-                if now.tzinfo is not None:
-                    now = now.replace(tzinfo=None)
-
-                diff = now - start_dt
-                actual_duration = round(diff.total_seconds() / 60, 2)
-
-            db.execute(
-                text("""
-                    UPDATE meetings 
-                    SET status = :status, 
-                        actual_ended_at = :now, 
-                        actual_duration = :actual_duration 
-                    WHERE id = :meeting_id OR CAST(id AS CHAR) = :meeting_id_str
-                """),
-                {
-                    "status": new_status, 
-                    "now": now, 
-                    "actual_duration": actual_duration, 
-                    "meeting_id": meeting_id, 
-                    "meeting_id_str": str(meeting_id)
-                }
-            )
-        else:
-            db.execute(
-                text("UPDATE meetings SET status = :status WHERE id = :meeting_id OR CAST(id AS CHAR) = :meeting_id_str"),
-                {"meeting_id": meeting_id, "meeting_id_str": str(meeting_id), "status": new_status}
-            )
+    try:
+        db.execute(
+            text("UPDATE meetings SET status = :status WHERE id = :meeting_id"),
+            {"meeting_id": int(meeting_id), "status": new_status}
+        )
 
         db.commit()
         return {"message": "Meeting status updated successfully", "meeting_id": meeting_id, "status": new_status}

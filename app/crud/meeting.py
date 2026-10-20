@@ -96,7 +96,12 @@ def list_meetings(
     if target_date:
         query = query.filter(Meeting.meeting_date == target_date)
 
-    return query.offset(skip).limit(limit).all()
+    return (
+        query.order_by(Meeting.created_at.desc(), Meeting.id.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
 
 
 def get_meeting(db: Session, meeting_id: int) -> Optional[Meeting]:
