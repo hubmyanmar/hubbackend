@@ -18,7 +18,24 @@ router = APIRouter(prefix="/meeting-records", tags=["meeting_records"])
 
 
 def _meeting_record_response(record: MeetingRecord) -> record_schemas.MeetingRecordOut:
-    response = record_schemas.MeetingRecordOut.from_orm(record)
+    response = record_schemas.MeetingRecordOut(
+        id=record.id,
+        meeting_id=record.meeting_id,
+        audio_url=record.audio_url,
+        summary=record.summary,
+        transcript=record.transcript,
+        notes=record.notes,
+        title=record.title,
+        room_name=record.room_name,
+        organizer_name=record.organizer_name,
+        decisions=record.decisions,
+        action_items=record.action_items,
+        task_id=record.task_id,
+        status=record.status,
+        processing_error=record.processing_error,
+        created_at=record.created_at,
+        updated_at=record.updated_at,
+    )
     if not response.audio_url and record.audio_object_key:
         response.audio_url = s3_multipart.generate_presigned_get_url(
             object_key=record.audio_object_key,
