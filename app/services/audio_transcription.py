@@ -8,7 +8,6 @@ from urllib.parse import urlparse
 
 import httpx
 from dotenv import load_dotenv
-from openai import OpenAI
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -36,23 +35,26 @@ def _validate_s3_url(audio_url: str) -> None:
         raise ValueError("audio_url must be a presigned HTTPS S3 URL")
 
 
-def _translate_audio_file_to_english(client: OpenAI, file_path: Path) -> str:
-    """Use Whisper's audio translation task, which returns English text."""
-    logger.info("Calling Whisper translation API: path=%s size_bytes=%s", file_path, file_path.stat().st_size)
+def _transcribe_audio_file(api_key: str, file_path: Path, timeout_seconds: float) -> str:
+    """Transcribe an audio chunk with OpenRouter, preserving its spoken language."""
+    logger.info("Calling Whisper transcription API: path=%s size_bytes=%s", file_path, file_path.stat().st_size)
     try:
         with file_path.open("rb") as audio_file:
-            response = client.audio.translations.create(
-                file=(file_path.name, audio_file),
-                model="whisper-1",
-                response_format="json",
-                temperature=0.0,
-            )
+            with httpx.Client(timeout=timeout_seconds) as client:
+                response = client.post(
+                    "https://openrouter.ai/api/v1/audio/transcriptions",
+                    headers={"Authorization": f"Bearer {api_key}"},
+                    data={"model": "openai/whisper-large-v3-turbo"},
+                    files={"file": (file_path.name, audio_file, "audio/wav")},
+                )
+                response.raise_for_status()
+                result = response.json()
     except Exception:
-        logger.exception("Whisper API call failed for audio chunk path=%s", file_path)
+        logger.exception("OpenRouter transcription API call failed for audio chunk path=%s", file_path)
         raise
-    text = response.text
+    text = result["text"]
     logger.info(
-        "Whisper translation returned: path=%s chars=%s preview=%r",
+        "Whisper transcription returned: path=%s chars=%s preview=%r",
         file_path,
         len(text or ""),
         " ".join((text or "").split())[:120],
@@ -61,15 +63,13 @@ def _translate_audio_file_to_english(client: OpenAI, file_path: Path) -> str:
 
 
 def transcribe_audio_file(audio_path: Path) -> dict:
-    """Return the Burmese transcript and structured insights for an audio file.
+    """Return the original-language transcript and structured insights for audio.
 
-    Whisper translates speech into English, then the configured LLM translates
-    that English text into Burmese. Large recordings are sent to Whisper in
-    sequential chunks before translation.
+    Large recordings are sent to Whisper in sequential chunks before analysis.
     """
-    api_key = os.getenv("OPENAI_API_KEY")
+    api_key = os.getenv("OPENROUTER_API_KEY")
     if not api_key:
-        raise AIServiceError("OPENAI_API_KEY is not configured")
+        raise AIServiceError("OPENROUTER_API_KEY is not configured")
     audio_path = Path(audio_path)
     if not audio_path.is_file():
         raise ValueError("Audio file does not exist")
@@ -79,7 +79,7 @@ def transcribe_audio_file(audio_path: Path) -> dict:
     if size > MAX_AUDIO_BYTES:
         raise ValueError("Audio file exceeds the 512 MB processing limit")
 
-    english_chunks = []
+    transcript_chunks = []
     try:
         # Segment every recording, including highly compressed long files that
         # may be below the byte threshold but exceed a safe audio duration.
@@ -127,7 +127,6 @@ def transcribe_audio_file(audio_path: Path) -> dict:
                 600,
                 max(120, 120 + math.ceil(largest_chunk_bytes / (1024 * 1024)) * 20),
             )
-            client = OpenAI(api_key=api_key, timeout=float(timeout_seconds), max_retries=0)
             logger.info(
                 "Audio split into %s chunks; largest_chunk_bytes=%s whisper_timeout_seconds=%s",
                 len(chunk_paths),
@@ -142,42 +141,25 @@ def transcribe_audio_file(audio_path: Path) -> dict:
                     chunk_path,
                     chunk_path.stat().st_size,
                 )
-                chunk_text = _translate_audio_file_to_english(client, chunk_path)
+                chunk_text = _transcribe_audio_file(api_key, chunk_path, float(timeout_seconds))
                 if not isinstance(chunk_text, str) or not chunk_text.strip():
                     raise AIServiceError("Whisper returned empty text")
-                english_chunks.append(chunk_text.strip())
+                transcript_chunks.append(chunk_text.strip())
                 logger.info("Whisper chunk %s/%s succeeded", index, len(chunk_paths))
-        english_text = "\n".join(english_chunks)
+        transcript_text = "\n".join(transcript_chunks)
     except AIServiceError:
         raise
     except Exception as exc:
-        raise AIServiceError("OpenAI Whisper transcription request failed") from exc
+        raise AIServiceError("OpenRouter Whisper transcription request failed") from exc
 
-    if len(english_chunks) == 0 or not isinstance(english_text, str) or not english_text.strip():
-        raise AIServiceError("Whisper returned an empty English translation")
+    if len(transcript_chunks) == 0 or not isinstance(transcript_text, str) or not transcript_text.strip():
+        raise AIServiceError("Whisper returned an empty transcription")
 
     # Import locally to avoid a module cycle: meeting_ai uses AIServiceError
     # from this module for its API error reporting.
-    from app.services.meeting_ai import extract_meeting_insights, translate_text_to_burmese
+    from app.services.meeting_ai import extract_meeting_insights
 
-    logger.info(
-        "Calling OpenRouter to translate transcript into Burmese: english_chars=%s preview=%r",
-        len(english_text),
-        " ".join(english_text.split())[:120],
-    )
-    try:
-        burmese_text = translate_text_to_burmese(english_text.strip())
-    except Exception:
-        logger.exception("English-to-Burmese LLM translation failed")
-        raise
-    if not isinstance(burmese_text, str) or not burmese_text.strip():
-        raise AIServiceError("LLM returned an empty Burmese translation")
-    logger.info(
-        "Burmese translation returned: chars=%s preview=%r",
-        len(burmese_text),
-        " ".join(burmese_text.split())[:120],
-    )
-    transcript = burmese_text.strip()
+    transcript = transcript_text.strip()
     try:
         insights = extract_meeting_insights(transcript)
     except Exception:
