@@ -12,8 +12,19 @@ from app.models.meeting_record import MeetingRecord
 from app.models.user import User
 from app.schemas import meeting_record as record_schemas
 from app.schemas.translation import ProcessingStatusResponse
+from app.services import s3_multipart
 
 router = APIRouter(prefix="/meeting-records", tags=["meeting_records"])
+
+
+def _meeting_record_response(record: MeetingRecord) -> record_schemas.MeetingRecordOut:
+    response = record_schemas.MeetingRecordOut.from_orm(record)
+    if not response.audio_url and record.audio_object_key:
+        response.audio_url = s3_multipart.generate_presigned_get_url(
+            object_key=record.audio_object_key,
+            expires_in=900,
+        )
+    return response
 
 
 @router.post("/", response_model=record_schemas.MeetingRecordOut, status_code=status.HTTP_201_CREATED)
@@ -31,7 +42,8 @@ def create_meeting_record(payload: record_schemas.MeetingRecordCreate, db: Sessi
 
 @router.get("/", response_model=List[record_schemas.MeetingRecordOut])
 def read_meeting_records(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    return record_crud.list_meeting_records(db=db, skip=skip, limit=limit)
+    records = record_crud.list_meeting_records(db=db, skip=skip, limit=limit)
+    return [_meeting_record_response(record) for record in records]
 
 
 @router.get("/{meeting_id}/status", response_model=ProcessingStatusResponse)
@@ -61,7 +73,7 @@ def read_meeting_record(meeting_id: int, db: Session = Depends(get_db)):
     obj = record_crud.get_by_meeting_id(db=db, meeting_id=meeting_id)
     if obj is None:
         raise HTTPException(status_code=404, detail="Meeting record not found")
-    return obj
+    return _meeting_record_response(obj)
 
 
 @router.put("/{meeting_id}", response_model=record_schemas.MeetingRecordOut)
