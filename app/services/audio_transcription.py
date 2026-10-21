@@ -3,6 +3,7 @@ import math
 import os
 import subprocess
 import tempfile
+from datetime import date
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -62,7 +63,7 @@ def _transcribe_audio_file(api_key: str, file_path: Path, timeout_seconds: float
     return text
 
 
-def transcribe_audio_file(audio_path: Path) -> dict:
+def transcribe_audio_file(audio_path: Path, meeting_date: date) -> dict:
     """Return the original-language transcript and structured insights for audio.
 
     Large recordings are sent to Whisper in sequential chunks before analysis.
@@ -161,14 +162,14 @@ def transcribe_audio_file(audio_path: Path) -> dict:
 
     transcript = transcript_text.strip()
     try:
-        insights = extract_meeting_insights(transcript)
+        insights = extract_meeting_insights(transcript, meeting_date)
     except Exception:
         logger.exception("Meeting insight extraction failed")
         raise
     return {"transcript": transcript, "insights": insights}
 
 
-def transcribe_audio(audio_url: str) -> dict:
+def transcribe_audio(audio_url: str, meeting_date: date) -> dict:
     """Fetch a legacy presigned URL to a temp file, then transcribe locally."""
     _validate_s3_url(audio_url)
     try:
@@ -186,7 +187,7 @@ def transcribe_audio(audio_url: str) -> dict:
                             if size > MAX_AUDIO_BYTES:
                                 raise ValueError("Audio file exceeds the 512 MB processing limit")
                             audio_file.write(chunk)
-            return transcribe_audio_file(audio_path)
+            return transcribe_audio_file(audio_path, meeting_date)
     except (httpx.HTTPError, ValueError) as exc:
         if isinstance(exc, ValueError):
             raise

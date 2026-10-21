@@ -2,6 +2,7 @@ import json
 import logging
 import math
 import os
+from datetime import date
 
 import httpx
 from dotenv import load_dotenv
@@ -142,9 +143,8 @@ def translate_text_to_burmese(english_text: str) -> str:
     return result
 
 
-def extract_meeting_insights(burmese_transcript: str) -> dict:
+def extract_meeting_insights(transcript: str, meeting_date: date) -> dict:
     """Extract structured meeting insights from a Burmese transcript."""
-    transcript = burmese_transcript
     if not isinstance(transcript, str) or not transcript.strip():
         raise AIServiceError("Cannot analyze an empty transcript")
     transcript_chunks = _split_text_preserving_content(transcript)
@@ -158,13 +158,21 @@ def extract_meeting_insights(burmese_transcript: str) -> dict:
                 {
                     "role": "system",
                     "content": (
-                        "Analyze only the provided Burmese meeting transcript section. Return a raw "
+                        "Analyze only the provided meeting transcript section. Return a raw "
                         "JSON object with no Markdown code blocks. All natural-language values must "
-                        "be Burmese. Use exactly these keys: \"summary\" (string), \"decisions\" "
+                        "be Burmese, except each action item's assignee name, which must be returned "
+                        "in English (Latin script) exactly as spoken in the transcript; never "
+                        "transliterate names into Burmese. The summary, decisions, and task text must "
+                        "be Burmese. The meeting took place on "
+                        f"{meeting_date.isoformat()}. Convert relative deadlines using this date. "
+                        "Whenever any deadline is mentioned, whether an explicit date or relative "
+                        "phrase, return its actual date in YYYY-MM-DD format. Return null for a "
+                        "deadline only when no deadline is mentioned at all. Use exactly these keys: "
+                        "\"summary\" (string), \"decisions\" "
                         "(array of strings), and \"action_items\" (array of objects with exactly "
                         "\"task\" (string), \"assignee\" (string or null), and \"deadline\" "
                         "(string or null)). Do not omit decisions or action items stated in this "
-                        "section. Use null when assignee or deadline is not stated. Do not invent facts."
+                        "section. Use null when assignee is not stated. Do not invent facts."
                     ),
                 },
                 {"role": "user", "content": chunk.strip()},

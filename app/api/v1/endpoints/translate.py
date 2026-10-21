@@ -98,14 +98,14 @@ def _process_meeting_audio(
                     local_audio_path.stat().st_size,
                 )
                 logger.info("Starting Whisper transcription: meeting_id=%s task_id=%s", meeting_id, task_id)
-                transcription_result = transcribe_audio_file(local_audio_path)
+                transcription_result = transcribe_audio_file(local_audio_path, meeting.meeting_date)
         else:
             logger.info(
                 "Starting audio download/transcription: meeting_id=%s task_id=%s",
                 meeting_id,
                 task_id,
             )
-            transcription_result = transcribe_audio(source_value)
+            transcription_result = transcribe_audio(source_value, meeting.meeting_date)
         transcript = transcription_result["transcript"]
         analysis = transcription_result["insights"]
         logger.info(
