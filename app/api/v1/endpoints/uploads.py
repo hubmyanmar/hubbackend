@@ -166,6 +166,9 @@ def complete_upload(
         record = MeetingRecord(meeting_id=payload.meeting_id)
         db.add(record)
     record.audio_object_key = payload.object_key
+    meeting = db.query(Meeting).filter(Meeting.id == payload.meeting_id).first()
+    if meeting is not None:
+        meeting.status = "stopped"
     try:
         playback_url = s3_multipart.generate_presigned_get_url(
             object_key=payload.object_key, expires_in=PRESIGNED_URL_TTL_SECONDS
