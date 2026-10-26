@@ -186,7 +186,7 @@ def transcribe_audio_file(audio_path: Path, meeting_date: date) -> dict:
                         {"role": "user", "content": chunk.strip()},
                     ],
                     operation=f"Burmese script conversion {index}/{len(transcript_chunks)}",
-                    max_tokens=6000,
+                    max_tokens=16000,
                 )
             )
         transcript = "\n".join(converted_chunks).strip()
