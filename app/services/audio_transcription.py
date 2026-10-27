@@ -159,37 +159,9 @@ def transcribe_audio_file(audio_path: Path, meeting_date: date) -> dict:
 
     # Import locally to avoid a module cycle: meeting_ai uses AIServiceError
     # from this module for its API error reporting.
-    from app.services.meeting_ai import (
-        _openrouter_chat,
-        _split_text_preserving_content,
-        extract_meeting_insights,
-    )
+    from app.services.meeting_ai import extract_meeting_insights
 
     transcript = transcript_text.strip()
-    if TRANSCRIPTION_LANGUAGE == "my":
-        converted_chunks = []
-        transcript_chunks = _split_text_preserving_content(transcript)
-        for index, chunk in enumerate(transcript_chunks, start=1):
-            converted_chunks.append(
-                _openrouter_chat(
-                    [
-                        {
-                            "role": "system",
-                            "content": (
-                                "Rewrite the provided Burmese-language transcript from Latin-script "
-                                "romanization into proper Myanmar script. Preserve person names and "
-                                "English technical terms in Latin script exactly as written. Change "
-                                "nothing else about the content: do not summarize, add, remove, or "
-                                "reorder anything. Return only the rewritten transcript text."
-                            ),
-                        },
-                        {"role": "user", "content": chunk.strip()},
-                    ],
-                    operation=f"Burmese script conversion {index}/{len(transcript_chunks)}",
-                    max_tokens=16000,
-                )
-            )
-        transcript = "\n".join(converted_chunks).strip()
     try:
         insights = extract_meeting_insights(transcript, meeting_date)
     except Exception:
