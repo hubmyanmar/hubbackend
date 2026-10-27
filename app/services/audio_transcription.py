@@ -21,7 +21,6 @@ CONTENT_TYPE_EXTENSIONS = {
     "audio/wav": "wav", "audio/x-wav": "wav", "audio/ogg": "ogg",
     "audio/webm": "webm", "audio/flac": "flac",
 }
-TRANSCRIPTION_LANGUAGE = "my"
 
 
 class AIServiceError(RuntimeError):
@@ -46,7 +45,7 @@ def _transcribe_audio_file(api_key: str, file_path: Path, timeout_seconds: float
                 response = client.post(
                     "https://openrouter.ai/api/v1/audio/transcriptions",
                     headers={"Authorization": f"Bearer {api_key}"},
-                    data={"model": "openai/whisper-large-v3", "language": "my"},
+                    data={"model": "google/gemini-3.5-transcribe"},
                     files={"file": (file_path.name, audio_file, "audio/wav")},
                 )
                 response.raise_for_status()
