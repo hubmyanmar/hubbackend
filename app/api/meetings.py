@@ -7,7 +7,9 @@ from sqlalchemy.orm import Session
 
 from app import models
 from app.crud import meeting as meeting_crud
+from app.core.security import get_current_user
 from app.db.session import get_db
+from app.models.user import User
 from app.schemas import meeting as meeting_schemas
 # from app.utils.zoho_utils import send_meeting_webhook_notification
 from app.utils.zoho_sync import send_zoho_notification
@@ -19,8 +21,11 @@ router = APIRouter(prefix="/meetings", tags=["meetings"])
 def create_meeting(
     meeting_in: meeting_schemas.MeetingCreate, 
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
+    meeting_in.created_by = current_user.id
+
     if meeting_in.end_time <= meeting_in.start_time:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, 
@@ -50,16 +55,6 @@ def create_meeting(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="The selected room is already booked for this date and time range."
             )
-    user = db.execute(
-        text("SELECT 1 FROM users WHERE id = :id"), 
-        {"id": meeting_in.created_by}
-    ).first()
-    if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, 
-            detail="created_by user not found"
-        )
-
     db_obj = meeting_crud.create_meeting(db=db, meeting_in=meeting_in)
 
     # Zoho Cliq Notification Trigger
