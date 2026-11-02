@@ -286,6 +286,26 @@ def get_zoho_users_list():
 
 @router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
 def register_user(payload: RegisterRequest, db: Session = Depends(get_db)):
+    company_users = get_company_users_from_zoho()
+    if not company_users:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Cannot verify your email right now. Please try again later.",
+        )
+
+    registering_email = str(payload.email).strip().lower()
+    company_emails = {
+        str(company_user.get("email", "")).strip().lower()
+        for company_user in company_users
+        if isinstance(company_user, dict)
+        and not str(company_user.get("email", "")).strip().lower().endswith("cliq.user")
+    }
+    if registering_email not in company_emails:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Please open a company Zoho account first, then register with that email address.",
+        )
+
     if crud_user.get_user_by_email(db, str(payload.email)):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
