@@ -45,7 +45,11 @@ def _meeting_record_response(record: MeetingRecord) -> record_schemas.MeetingRec
 
 
 @router.post("/", response_model=record_schemas.MeetingRecordOut, status_code=status.HTTP_201_CREATED)
-def create_meeting_record(payload: record_schemas.MeetingRecordCreate, db: Session = Depends(get_db)):
+def create_meeting_record(
+    payload: record_schemas.MeetingRecordCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     meeting = db.execute(text("SELECT 1 FROM meetings WHERE id = :id"), {"id": payload.meeting_id}).first()
     if meeting is None:
         raise HTTPException(status_code=400, detail="meeting_id not found")
@@ -58,7 +62,12 @@ def create_meeting_record(payload: record_schemas.MeetingRecordCreate, db: Sessi
 
 
 @router.get("/", response_model=List[record_schemas.MeetingRecordOut])
-def read_meeting_records(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+def read_meeting_records(
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     records = record_crud.list_meeting_records(db=db, skip=skip, limit=limit)
     return [_meeting_record_response(record) for record in records]
 
@@ -86,7 +95,11 @@ def read_meeting_processing_status(
 
 
 @router.get("/{meeting_id}", response_model=record_schemas.MeetingRecordOut)
-def read_meeting_record(meeting_id: int, db: Session = Depends(get_db)):
+def read_meeting_record(
+    meeting_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     obj = record_crud.get_by_meeting_id(db=db, meeting_id=meeting_id)
     if obj is None:
         raise HTTPException(status_code=404, detail="Meeting record not found")
@@ -99,6 +112,7 @@ def update_meeting_record(
     meeting_id: int,
     updates: record_schemas.MeetingRecordUpdate,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     obj = record_crud.get_by_meeting_id(db=db, meeting_id=meeting_id)
     if obj is None:
@@ -107,7 +121,11 @@ def update_meeting_record(
 
 
 @router.delete("/{meeting_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_meeting_record(meeting_id: int, db: Session = Depends(get_db)):
+def delete_meeting_record(
+    meeting_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     obj = record_crud.get_by_meeting_id(db=db, meeting_id=meeting_id)
     if obj is None:
         raise HTTPException(status_code=404, detail="Meeting record not found")
