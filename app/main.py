@@ -4,13 +4,14 @@ from typing import Any, Optional
 
 import httpx
 from dotenv import load_dotenv
-from fastapi import FastAPI, Query, Request
+from fastapi import Depends, FastAPI, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 load_dotenv()
 
 from app.api.v1.router import api_router
+from app.core.security import get_current_user
 
 app = FastAPI(title="Minutemind Backend")
 
@@ -96,6 +97,7 @@ def get_zoho_access_token() -> str:
 def zoho_crm_leads(
     limit: int = Query(200, ge=1, le=200),
     page: int = Query(1, ge=1),
+    current_user = Depends(get_current_user),
 ):
     try:
         token = get_zoho_access_token()

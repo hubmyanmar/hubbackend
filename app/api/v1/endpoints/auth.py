@@ -280,7 +280,7 @@ def get_allowed_users() -> list[dict]:
     return _users_cache["data"]
 
 @router.get("/users")
-def get_zoho_users_list():
+def get_zoho_users_list(current_user = Depends(get_current_user)):
     return get_allowed_users()
 
 
