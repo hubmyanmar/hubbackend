@@ -352,6 +352,9 @@ def login_user(payload: LoginRequest, db: Session = Depends(get_db)):
             detail="Incorrect email or password",
         )
 
+    if not user.is_active:
+        raise HTTPException(status_code=403, detail="This account has been deactivated. Please contact an administrator.")
+
     user = _bootstrap_first_admin(db, user)
 
     token = create_access_token({

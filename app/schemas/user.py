@@ -29,6 +29,7 @@ class UserUpdate(BaseModel):
 class UserOut(UserBase):
     id: int
     role: str
+    is_active: bool
     created_at: datetime
     updated_at: datetime
     
@@ -37,3 +38,7 @@ class UserOut(UserBase):
 
 class RoleUpdate(BaseModel):
     role: Literal["admin", "approver", "member"]
+
+
+class ActiveUpdate(BaseModel):
+    is_active: bool

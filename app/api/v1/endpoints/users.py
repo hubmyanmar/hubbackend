@@ -6,7 +6,7 @@ from app.core.database import get_db
 from app.core.security import get_current_user, require_admin
 from app.crud import crud_user
 from app.models.user import User
-from app.schemas.user import RoleUpdate, UserCreate, UserOut, UserUpdate
+from app.schemas.user import ActiveUpdate, RoleUpdate, UserCreate, UserOut, UserUpdate
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -105,6 +105,31 @@ def update_user_role(
             )
 
     db_user.role = role_update.role
+    db.commit()
+    db.refresh(db_user)
+    return db_user
+
+
+@router.patch("/{user_id}/active", response_model=UserOut)
+def update_user_active(
+    user_id: int,
+    active_update: ActiveUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    db_user = crud_user.get_user(db, user_id=user_id)
+    if db_user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    if not active_update.is_active and db_user.role == "admin":
+        admin_count = db.query(User).filter(User.role == "admin").count()
+        if admin_count == 1:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="The last admin cannot be deactivated",
+            )
+
+    db_user.is_active = active_update.is_active
     db.commit()
     db.refresh(db_user)
     return db_user

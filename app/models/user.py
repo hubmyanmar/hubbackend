@@ -1,4 +1,4 @@
-from sqlalchemy import Column, BigInteger, String, Text, DateTime, func
+from sqlalchemy import Column, BigInteger, Boolean, String, Text, DateTime, func
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 
@@ -11,6 +11,7 @@ class User(Base):
     password = Column(String(255), nullable=True)
     position = Column(String(100), nullable=True)
     role = Column(String(50), nullable=False, server_default="member")
+    is_active = Column(Boolean, nullable=False, default=True, server_default="true")
     
     image = Column(Text, nullable=True)
     
