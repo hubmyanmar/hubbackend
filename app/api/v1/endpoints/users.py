@@ -67,6 +67,9 @@ def update_user(
     db: Session = Depends(get_db),
     current_user = Depends(get_current_user),
 ):
+    if current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="You can only edit your own profile")
+
     db_user = crud_user.get_user(db, user_id=user_id)
     if db_user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
