@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
@@ -33,3 +33,7 @@ class UserOut(UserBase):
     updated_at: datetime
     
     model_config = ConfigDict(from_attributes=True)
+
+
+class RoleUpdate(BaseModel):
+    role: Literal["admin", "approver", "member"]

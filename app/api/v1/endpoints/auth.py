@@ -14,10 +14,24 @@ from app.crud import crud_user
 from app.schemas.auth import LoginRequest, RegisterRequest, Token
 from app.schemas.user import UserCreate, UserOut
 from app.core.security import get_current_user
+from app.models.user import User
 
 load_dotenv()
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+def _bootstrap_first_admin(db: Session, user: User) -> User:
+    first_admin_email = os.getenv("FIRST_ADMIN_EMAIL")
+    if (
+        first_admin_email
+        and user.email.strip().lower() == first_admin_email.strip().lower()
+        and user.role != "admin"
+    ):
+        user.role = "admin"
+        db.commit()
+        db.refresh(user)
+    return user
 
 ZOHO_TOKEN_URL = "https://accounts.zoho.com/oauth/v2/token"
 ZOHO_CLIQ_USER_URLS = [
@@ -319,7 +333,8 @@ def register_user(payload: RegisterRequest, db: Session = Depends(get_db)):
         position=payload.position,
         image=payload.image,
     )
-    return crud_user.create_user(db, user_payload)
+    user = crud_user.create_user(db, user_payload)
+    return _bootstrap_first_admin(db, user)
 
 
 @router.post("/login")
@@ -336,6 +351,8 @@ def login_user(payload: LoginRequest, db: Session = Depends(get_db)):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
         )
+
+    user = _bootstrap_first_admin(db, user)
 
     token = create_access_token({
         "sub": str(user.id),
