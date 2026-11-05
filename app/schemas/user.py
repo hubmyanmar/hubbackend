@@ -28,6 +28,7 @@ class UserUpdate(BaseModel):
 
 class UserOut(UserBase):
     id: int
+    role: str
     created_at: datetime
     updated_at: datetime
     

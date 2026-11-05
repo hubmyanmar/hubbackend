@@ -342,6 +342,7 @@ def login_user(payload: LoginRequest, db: Session = Depends(get_db)):
         "email": user.email,
         "name": user.name,
         "position": user.position,
+        "role": user.role,
     })
 
     return {

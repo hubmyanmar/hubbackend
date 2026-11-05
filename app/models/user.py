@@ -10,6 +10,7 @@ class User(Base):
     email = Column(String(255), unique=True, nullable=False, index=True)
     password = Column(String(255), nullable=True)
     position = Column(String(100), nullable=True)
+    role = Column(String(50), nullable=False, server_default="member")
     
     image = Column(Text, nullable=True)
     
