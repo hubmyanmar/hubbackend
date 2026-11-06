@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse
 load_dotenv()
 
 from app.api.v1.router import api_router
+from app.api.settings import router as settings_router
 from app.core.security import get_current_user
 
 app = FastAPI(title="Minutemind Backend")
@@ -45,6 +46,7 @@ app.add_middleware(
 
 # app.include_router(api_router)
 app.include_router(api_router)
+app.include_router(settings_router, prefix="/api/v1")
 # app.include_router(api_router, prefix="/api/v1")
 
 ZOHO_TOKEN_URL = "https://accounts.zoho.com/oauth/v2/token"
