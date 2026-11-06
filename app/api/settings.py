@@ -18,6 +18,8 @@ DEFAULTS = {
     "notify_email": True,
     "notify_in_app": True,
     "notify_zoho_cliq": True,
+    "approver_admin": True,
+    "approver_approver": True,
 }
 
 
@@ -33,6 +35,8 @@ def _to_response(rule: BookingRule) -> BookingRulesOut:
         notify_email=rule.notify_email,
         notify_in_app=rule.notify_in_app,
         notify_zoho_cliq=rule.notify_zoho_cliq,
+        approver_admin=rule.approver_admin,
+        approver_approver=rule.approver_approver,
     )
 
 
@@ -65,6 +69,11 @@ def update_booking_rules(
 ):
     work_start = _parse_time(rules_in.work_start, "work_start")
     work_end = _parse_time(rules_in.work_end, "work_end")
+    if not rules_in.approver_admin and not rules_in.approver_approver:
+        raise HTTPException(
+            status_code=400,
+            detail="At least one approver role must be selected",
+        )
     if work_end <= work_start:
         raise HTTPException(status_code=400, detail="work_end must be after work_start")
 
@@ -79,6 +88,8 @@ def update_booking_rules(
     rule.notify_email = rules_in.notify_email
     rule.notify_in_app = rules_in.notify_in_app
     rule.notify_zoho_cliq = rules_in.notify_zoho_cliq
+    rule.approver_admin = rules_in.approver_admin
+    rule.approver_approver = rules_in.approver_approver
 
     db.commit()
     db.refresh(rule)

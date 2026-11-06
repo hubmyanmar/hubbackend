@@ -8,6 +8,8 @@ class BookingRulesOut(BaseModel):
     notify_email: bool
     notify_in_app: bool
     notify_zoho_cliq: bool
+    approver_admin: bool
+    approver_approver: bool
 
 
 class BookingRulesUpdate(BaseModel):
@@ -17,3 +19,5 @@ class BookingRulesUpdate(BaseModel):
     notify_email: bool
     notify_in_app: bool
     notify_zoho_cliq: bool
+    approver_admin: bool
+    approver_approver: bool

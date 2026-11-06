@@ -1,0 +1,2 @@
+ALTER TABLE booking_rules ADD COLUMN approver_admin BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE booking_rules ADD COLUMN approver_approver BOOLEAN NOT NULL DEFAULT TRUE;
