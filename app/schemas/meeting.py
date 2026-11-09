@@ -7,6 +7,9 @@ class MeetingParticipantSchema(BaseModel):
     name: Optional[str] = None
     email: EmailStr
 
+    class Config:
+        from_attributes = True
+
 class RoomOut(BaseModel):
     id: int
     name: str
