@@ -9,6 +9,30 @@ REFRESH_TOKEN = os.getenv("REFRESH_TOKEN")
 CHANNEL_ID = os.getenv("CHANNEL_ID")
 
 
+def format_to_ampm(t_obj):
+    if not t_obj:
+        return ""
+    t_str = str(t_obj).strip()
+    try:
+        dt = datetime.strptime(t_str, "%Y-%m-%d %H:%M:%S")
+        return dt.strftime("%I:%M %p")
+    except ValueError:
+        pass
+    try:
+        dt = datetime.strptime(t_str, "%Y-%m-%d %H:%M")
+        return dt.strftime("%I:%M %p")
+    except ValueError:
+        pass
+    for fmt in ("%H:%M:%S", "%H:%M"):
+        try:
+            dt = datetime.strptime(t_str, fmt)
+            return dt.strftime("%I:%M %p")
+        except ValueError:
+            pass
+
+    return t_str
+
+
 def get_access_token():
     """Zoho OAuth Server မှ Access Token တောင်းယူခြင်း"""
     url = "https://accounts.zoho.com/oauth/v2/token"
@@ -92,29 +116,6 @@ def send_zoho_notification(meeting_title, start_time, end_time, participants, me
             "Content-Type": "application/json"
         }
         profile_mentions = ", ".join([f"<@{email}>" for email in attendees_list]) if attendees_list else "None"
-        def format_to_ampm(t_obj):
-            if not t_obj:
-                return ""
-            t_str = str(t_obj).strip()
-            try:
-                dt = datetime.strptime(t_str, "%Y-%m-%d %H:%M:%S")
-                return dt.strftime("%I:%M %p")
-            except ValueError:
-                pass
-            try:
-                dt = datetime.strptime(t_str, "%Y-%m-%d %H:%M")
-                return dt.strftime("%I:%M %p")
-            except ValueError:
-                pass
-            for fmt in ("%H:%M:%S", "%H:%M"):
-                try:
-                    dt = datetime.strptime(t_str, fmt)
-                    return dt.strftime("%I:%M %p")
-                except ValueError:
-                    pass
-
-            return t_str
-
         formatted_start = format_to_ampm(start_time)
         formatted_end = format_to_ampm(end_time)
         time_display_str = f"{formatted_start} - {formatted_end}"
@@ -172,7 +173,6 @@ def send_booking_decision_alert(
     """Post a booking decision card to the configured Zoho Cliq channel."""
     try:
         access_token = get_access_token()
-        mentions = ", ".join(f"<@{email}>" for email in mention_emails)
         event_labels = {
             "pending": ("Booking Awaiting Approval", "Booker"),
             "approved": ("Booking Approved", "Decided by"),
@@ -180,31 +180,35 @@ def send_booking_decision_alert(
         }
         event_title, person_label = event_labels[event]
         person_name = booker_name if event == "pending" else decider_name
-        payload = {
-            "text": f"📅 **{event_title}: {meeting_title}** {mentions}",
-            "card": {
-                "title": f"{event_title} - {meeting_title}",
-                "theme": "modern-inline",
-            },
-            "slides": [
-                {
-                    "type": "label",
-                    "data": [
-                        {"Date": str(meeting_date)},
-                        {"Time": f"{start_time} - {end_time}"},
-                        {"Location": room_name},
-                        {person_label: person_name},
-                        {"Mentioned": mentions},
-                    ],
-                }
-            ],
-        }
-        url = f"https://cliq.zoho.com/api/v2/chats/{CHANNEL_ID}/message"
         headers = {
             "Authorization": f"Zoho-oauthtoken {access_token}",
             "Content-Type": "application/json",
         }
-        response = requests.post(url, headers=headers, json=payload)
-        print("Zoho booking decision alert response:", response.text)
+        time_display = f"{format_to_ampm(start_time)} - {format_to_ampm(end_time)}"
+        for email in mention_emails:
+            payload = {
+                "text": f"📅 **{event_title}: {meeting_title}**",
+                "card": {
+                    "title": f"{meeting_title} - {room_name}",
+                    "theme": "modern-inline",
+                },
+                "slides": [
+                    {
+                        "type": "label",
+                        "data": [
+                            {"Date": str(meeting_date)},
+                            {"Location": room_name},
+                            {"Time": time_display},
+                            {person_label: person_name},
+                        ],
+                    }
+                ],
+            }
+            url = f"https://cliq.zoho.com/api/v2/buddies/{email}/message"
+            try:
+                response = requests.post(url, headers=headers, json=payload)
+                print("Zoho booking decision alert response:", response.text)
+            except Exception as exc:
+                print("Zoho booking decision alert error:", str(exc))
     except Exception as exc:
         print("Zoho booking decision alert error:", str(exc))
