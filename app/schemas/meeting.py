@@ -72,3 +72,6 @@ class MeetingOut(MeetingBase):
     class Config:
         from_attributes = True
         extra = "ignore"
+
+class PendingApprovalOut(MeetingOut):
+    created_by_name: str

@@ -2,6 +2,7 @@ import enum
 from sqlalchemy import (
     Column,
     BigInteger,
+    Boolean,
     String,
     Text,
     Date,
@@ -44,7 +45,10 @@ class Meeting(Base):
     room_id = Column(BigInteger, ForeignKey("meeting_rooms.id", ondelete="SET NULL"), nullable=True)
     company_name = Column(String(255), nullable=False)
     status = Column(String(32), nullable=False, default="scheduled", server_default="scheduled")
+    invite_cliq = Column(Boolean, nullable=False, default=False, server_default="false")
     created_by = Column(BigInteger, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    decided_by = Column(BigInteger, ForeignKey("users.id"), nullable=True)
+    decided_at = Column(TIMESTAMP(timezone=True), nullable=True)
 
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)

@@ -23,7 +23,8 @@ def check_room_conflict(
         Meeting.room_id == room_id,
         Meeting.meeting_date == meeting_date,
         Meeting.start_time < end_time,
-        Meeting.end_time > start_time
+        Meeting.end_time > start_time,
+        Meeting.status.in_(("scheduled", "approved", "running", "pending")),
     )
     
     if exclude_meeting_id is not None:
@@ -39,6 +40,10 @@ def create_meeting(db: Session, meeting_in: MeetingCreate) -> Meeting:
         exclude_fields.add("participants")
 
     meeting_data = meeting_in.model_dump(exclude=exclude_fields)
+    meeting_data["invite_cliq"] = bool(
+        getattr(meeting_in, "inviteCliq", False)
+        or getattr(meeting_in, "invite_cliq", False)
+    )
     db_meeting = Meeting(**meeting_data)
     
     db.add(db_meeting)
