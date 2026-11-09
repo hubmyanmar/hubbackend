@@ -156,3 +156,55 @@ def send_zoho_notification(meeting_title, start_time, end_time, participants, me
 
     except Exception as e:
         print("Zoho API Sync Background Error:", str(e))
+
+
+def send_booking_decision_alert(
+    event,
+    meeting_title,
+    meeting_date,
+    start_time,
+    end_time,
+    room_name,
+    booker_name,
+    decider_name,
+    mention_emails,
+):
+    """Post a booking decision card to the configured Zoho Cliq channel."""
+    try:
+        access_token = get_access_token()
+        mentions = ", ".join(f"<@{email}>" for email in mention_emails)
+        event_labels = {
+            "pending": ("Booking Awaiting Approval", "Booker"),
+            "approved": ("Booking Approved", "Decided by"),
+            "rejected": ("Booking Rejected", "Decided by"),
+        }
+        event_title, person_label = event_labels[event]
+        person_name = booker_name if event == "pending" else decider_name
+        payload = {
+            "text": f"📅 **{event_title}: {meeting_title}** {mentions}",
+            "card": {
+                "title": f"{event_title} - {meeting_title}",
+                "theme": "modern-inline",
+            },
+            "slides": [
+                {
+                    "type": "label",
+                    "data": [
+                        {"Date": str(meeting_date)},
+                        {"Time": f"{start_time} - {end_time}"},
+                        {"Location": room_name},
+                        {person_label: person_name},
+                        {"Mentioned": mentions},
+                    ],
+                }
+            ],
+        }
+        url = f"https://cliq.zoho.com/api/v2/chats/{CHANNEL_ID}/message"
+        headers = {
+            "Authorization": f"Zoho-oauthtoken {access_token}",
+            "Content-Type": "application/json",
+        }
+        response = requests.post(url, headers=headers, json=payload)
+        print("Zoho booking decision alert response:", response.text)
+    except Exception as exc:
+        print("Zoho booking decision alert error:", str(exc))

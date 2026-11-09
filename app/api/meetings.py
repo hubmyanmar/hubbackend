@@ -10,11 +10,12 @@ from app.crud import meeting as meeting_crud
 from app.core.security import get_current_user
 from app.db.session import get_db
 from app.models.booking_rule import BookingRule
+from app.models.notification_preference import NotificationPreference
 from app.models.user import User
 from app.schemas import meeting as meeting_schemas
 from app.api.settings import DEFAULTS
 # from app.utils.zoho_utils import send_meeting_webhook_notification
-from app.utils.zoho_sync import send_zoho_notification
+from app.utils.zoho_sync import send_booking_decision_alert, send_zoho_notification
 
 router = APIRouter(prefix="/meetings", tags=["meetings"])
 
@@ -44,6 +45,67 @@ def _require_approver(db, current_user: User):
     )
     if not allowed:
         raise HTTPException(status_code=403, detail="Approver access required")
+
+
+def _decision_alert_recipients(db, event: str, booking_rules, booker_id: int):
+    if not booking_rules["notify_zoho_cliq"]:
+        return []
+    if event == "pending":
+        roles = []
+        if booking_rules["approver_admin"]:
+            roles.append("admin")
+        if booking_rules["approver_approver"]:
+            roles.append("approver")
+        if not roles:
+            return []
+        recipients = (
+            db.query(User)
+            .join(NotificationPreference, NotificationPreference.user_id == User.id)
+            .filter(
+                User.is_active.is_(True),
+                User.role.in_(roles),
+                User.id != booker_id,
+                NotificationPreference.cliq_enabled.is_(True),
+            )
+            .all()
+        )
+        return recipients
+
+    recipient = (
+        db.query(User)
+        .join(NotificationPreference, NotificationPreference.user_id == User.id)
+        .filter(
+            User.id == booker_id,
+            NotificationPreference.cliq_enabled.is_(True),
+        )
+        .first()
+    )
+    return [recipient] if recipient is not None else []
+
+
+def _queue_decision_alert(
+    background_tasks,
+    event: str,
+    meeting,
+    recipients,
+    booker_name: str,
+    decider_name: Optional[str] = None,
+):
+    if not recipients:
+        return
+    room_name = meeting.room.name if meeting.room is not None else "Online"
+    background_tasks.add_task(
+        send_booking_decision_alert,
+        event=event,
+        meeting_title=meeting.title,
+        meeting_date=meeting.meeting_date,
+        start_time=meeting.start_time,
+        end_time=meeting.end_time,
+        room_name=room_name,
+        booker_name=booker_name,
+        decider_name=decider_name,
+        mention_emails=[recipient.email for recipient in recipients],
+    )
 
 
 def _enforce_working_hours(db, start_time, end_time):
@@ -105,6 +167,18 @@ def create_meeting(
                 detail="The selected room is already booked for this date and time range."
             )
     db_obj = meeting_crud.create_meeting(db=db, meeting_in=meeting_in)
+
+    if db_obj.status == "pending":
+        recipients = _decision_alert_recipients(
+            db, "pending", booking_rules, db_obj.created_by
+        )
+        _queue_decision_alert(
+            background_tasks,
+            "pending",
+            db_obj,
+            recipients,
+            booker_name=current_user.name,
+        )
 
     # Zoho Cliq Notification Trigger
     should_invite = getattr(meeting_in, "inviteCliq", False) or getattr(meeting_in, "invite_cliq", False)
@@ -185,6 +259,19 @@ def approve_meeting(
     db.commit()
     db.refresh(db_obj)
 
+    booking_rules = _booking_rule_values(db)
+    recipients = _decision_alert_recipients(
+        db, "approved", booking_rules, db_obj.created_by
+    )
+    _queue_decision_alert(
+        background_tasks,
+        "approved",
+        db_obj,
+        recipients,
+        booker_name=db_obj.creator.name,
+        decider_name=current_user.name,
+    )
+
     if db_obj.invite_cliq:
         meeting_date = getattr(db_obj, "meeting_date", "")
         start_time_val = getattr(db_obj, "start_time", "")
@@ -205,6 +292,7 @@ def approve_meeting(
 @router.post("/{meeting_id}/reject", response_model=meeting_schemas.MeetingOut)
 def reject_meeting(
     meeting_id: int,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -219,6 +307,18 @@ def reject_meeting(
     db_obj.decided_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(db_obj)
+    booking_rules = _booking_rule_values(db)
+    recipients = _decision_alert_recipients(
+        db, "rejected", booking_rules, db_obj.created_by
+    )
+    _queue_decision_alert(
+        background_tasks,
+        "rejected",
+        db_obj,
+        recipients,
+        booker_name=db_obj.creator.name,
+        decider_name=current_user.name,
+    )
     return db_obj
 
 
