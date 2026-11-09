@@ -108,6 +108,87 @@ def _queue_decision_alert(
     )
 
 
+def _inapp_recipients(db, event, meeting):
+    from sqlalchemy import or_
+
+    booking_rules = _booking_rule_values(db)
+    if not booking_rules["notify_in_app"]:
+        return []
+    preference_gate = or_(
+        NotificationPreference.user_id.is_(None),
+        NotificationPreference.inapp_enabled.is_(True),
+    )
+    if event == "pending":
+        roles = []
+        if booking_rules["approver_admin"]:
+            roles.append("admin")
+        if booking_rules["approver_approver"]:
+            roles.append("approver")
+        if not roles:
+            return []
+        return (
+            db.query(User)
+            .outerjoin(NotificationPreference, NotificationPreference.user_id == User.id)
+            .filter(
+                User.is_active.is_(True),
+                User.role.in_(roles),
+                User.id != meeting.created_by,
+                preference_gate,
+            )
+            .all()
+        )
+
+    recipient = (
+        db.query(User)
+        .outerjoin(NotificationPreference, NotificationPreference.user_id == User.id)
+        .filter(User.id == meeting.created_by, preference_gate)
+        .first()
+    )
+    return [recipient] if recipient is not None else []
+
+
+def _create_inapp_notifications(db, event, meeting, recipients):
+    from app.models.notification import Notification
+    from app.utils.zoho_sync import format_to_ampm
+
+    if not recipients:
+        return
+    title = {
+        "pending": "Booking Awaiting Approval",
+        "approved": "Booking Approved",
+        "rejected": "Booking Rejected",
+    }[event]
+    room_name = meeting.room.name if meeting.room is not None else "Online"
+    start_ampm = format_to_ampm(meeting.start_time)
+    end_ampm = format_to_ampm(meeting.end_time)
+    booker_name = meeting.creator.name
+    if event == "pending":
+        body = (
+            f"{meeting.title} · {meeting.meeting_date} · {start_ampm} - {end_ampm} · "
+            f"{room_name} · Booker: {booker_name}"
+        )
+    else:
+        decider = db.query(User).filter(User.id == meeting.decided_by).first()
+        body = (
+            f"{meeting.title} · {meeting.meeting_date} · {start_ampm} - {end_ampm} · "
+            f"{room_name} · Decided by: {decider.name}"
+        )
+    db.add_all(
+        [
+            Notification(
+                user_id=recipient.id,
+                meeting_id=meeting.id,
+                event=event,
+                title=title,
+                body=body,
+                is_read=False,
+            )
+            for recipient in recipients
+        ]
+    )
+    db.commit()
+
+
 def _enforce_working_hours(db, start_time, end_time):
     rule = db.query(BookingRule).filter(BookingRule.id == 1).first()
     work_start = rule.work_start if rule else time(9, 0)
@@ -179,6 +260,12 @@ def create_meeting(
             recipients,
             booker_name=current_user.name,
         )
+        try:
+            inapp_recipients = _inapp_recipients(db, "pending", db_obj)
+            _create_inapp_notifications(db, "pending", db_obj, inapp_recipients)
+        except Exception as exc:
+            db.rollback()
+            print(f"Failed to create pending in-app notifications: {exc}")
 
     # Zoho Cliq Notification Trigger
     should_invite = getattr(meeting_in, "inviteCliq", False) or getattr(meeting_in, "invite_cliq", False)
@@ -271,6 +358,12 @@ def approve_meeting(
         booker_name=db_obj.creator.name,
         decider_name=current_user.name,
     )
+    try:
+        inapp_recipients = _inapp_recipients(db, "approved", db_obj)
+        _create_inapp_notifications(db, "approved", db_obj, inapp_recipients)
+    except Exception as exc:
+        db.rollback()
+        print(f"Failed to create approved in-app notification: {exc}")
 
     if db_obj.invite_cliq:
         meeting_date = getattr(db_obj, "meeting_date", "")
@@ -319,6 +412,12 @@ def reject_meeting(
         booker_name=db_obj.creator.name,
         decider_name=current_user.name,
     )
+    try:
+        inapp_recipients = _inapp_recipients(db, "rejected", db_obj)
+        _create_inapp_notifications(db, "rejected", db_obj, inapp_recipients)
+    except Exception as exc:
+        db.rollback()
+        print(f"Failed to create rejected in-app notification: {exc}")
     return db_obj
 
 
