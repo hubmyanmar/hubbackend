@@ -18,4 +18,6 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
-    meetings_created = relationship("Meeting", back_populates="creator")
+    meetings_created = relationship(
+        "Meeting", back_populates="creator", foreign_keys="Meeting.created_by"
+    )
