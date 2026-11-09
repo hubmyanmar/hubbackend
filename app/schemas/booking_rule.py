@@ -21,3 +21,15 @@ class BookingRulesUpdate(BaseModel):
     notify_zoho_cliq: bool
     approver_admin: bool
     approver_approver: bool
+
+
+class NotificationPreferencesUpdate(BaseModel):
+    email_enabled: bool
+    inapp_enabled: bool
+    cliq_enabled: bool
+
+
+class NotificationPreferencesOut(BaseModel):
+    email_enabled: bool
+    inapp_enabled: bool
+    cliq_enabled: bool

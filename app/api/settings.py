@@ -7,7 +7,13 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.security import get_current_user, require_admin
 from app.models.booking_rule import BookingRule
-from app.schemas.booking_rule import BookingRulesOut, BookingRulesUpdate
+from app.models.notification_preference import NotificationPreference
+from app.schemas.booking_rule import (
+    BookingRulesOut,
+    BookingRulesUpdate,
+    NotificationPreferencesOut,
+    NotificationPreferencesUpdate,
+)
 
 router = APIRouter(prefix="/settings", tags=["Settings"])
 
@@ -94,3 +100,54 @@ def update_booking_rules(
     db.commit()
     db.refresh(rule)
     return _to_response(rule)
+
+
+@router.get("/notification-preferences", response_model=NotificationPreferencesOut)
+def read_notification_preferences(
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    preference = (
+        db.query(NotificationPreference)
+        .filter(NotificationPreference.user_id == current_user.id)
+        .first()
+    )
+    if preference is None:
+        return NotificationPreferencesOut(
+            email_enabled=True,
+            inapp_enabled=True,
+            cliq_enabled=False,
+        )
+    return NotificationPreferencesOut(
+        email_enabled=preference.email_enabled,
+        inapp_enabled=preference.inapp_enabled,
+        cliq_enabled=preference.cliq_enabled,
+    )
+
+
+@router.put("/notification-preferences", response_model=NotificationPreferencesOut)
+def update_notification_preferences(
+    preferences_in: NotificationPreferencesUpdate,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    preference = (
+        db.query(NotificationPreference)
+        .filter(NotificationPreference.user_id == current_user.id)
+        .first()
+    )
+    if preference is None:
+        preference = NotificationPreference(user_id=current_user.id)
+        db.add(preference)
+
+    preference.email_enabled = preferences_in.email_enabled
+    preference.inapp_enabled = preferences_in.inapp_enabled
+    preference.cliq_enabled = preferences_in.cliq_enabled
+
+    db.commit()
+    db.refresh(preference)
+    return NotificationPreferencesOut(
+        email_enabled=preference.email_enabled,
+        inapp_enabled=preference.inapp_enabled,
+        cliq_enabled=preference.cliq_enabled,
+    )
