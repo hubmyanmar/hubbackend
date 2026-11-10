@@ -23,6 +23,10 @@ class BookingRulesUpdate(BaseModel):
     approver_approver: bool
 
 
+class CalendarIntegrationsUpdate(BaseModel):
+    zoho_enabled: bool
+
+
 class NotificationPreferencesUpdate(BaseModel):
     email_enabled: bool
     inapp_enabled: bool

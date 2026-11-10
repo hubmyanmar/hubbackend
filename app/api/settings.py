@@ -9,6 +9,7 @@ from app.core.security import get_current_user, require_admin
 from app.models.booking_rule import BookingRule
 from app.models.notification_preference import NotificationPreference
 from app.schemas.booking_rule import (
+    CalendarIntegrationsUpdate,
     BookingRulesOut,
     BookingRulesUpdate,
     NotificationPreferencesOut,
@@ -24,6 +25,7 @@ DEFAULTS = {
     "notify_email": True,
     "notify_in_app": True,
     "notify_zoho_cliq": True,
+    "zoho_enabled": True,
     "approver_admin": True,
     "approver_approver": True,
 }
@@ -100,6 +102,40 @@ def update_booking_rules(
     db.commit()
     db.refresh(rule)
     return _to_response(rule)
+
+
+@router.get("/calendar-integrations")
+def read_calendar_integrations(
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    rule = db.query(BookingRule).filter(BookingRule.id == 1).first()
+    zoho_enabled = rule.zoho_enabled if rule is not None else DEFAULTS["zoho_enabled"]
+    try:
+        from app.utils.zoho_sync import get_access_token
+
+        zoho_connected = bool(get_access_token())
+    except Exception:
+        zoho_connected = False
+    return {"zoho_enabled": zoho_enabled, "zoho_connected": zoho_connected}
+
+
+@router.put("/calendar-integrations")
+def update_calendar_integrations(
+    integrations_in: CalendarIntegrationsUpdate,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_admin),
+):
+    rule = db.query(BookingRule).filter(BookingRule.id == 1).first()
+    if rule is None:
+        rule = BookingRule(id=1)
+        db.add(rule)
+
+    rule.zoho_enabled = integrations_in.zoho_enabled
+
+    db.commit()
+    db.refresh(rule)
+    return {"zoho_enabled": rule.zoho_enabled}
 
 
 @router.get("/notification-preferences", response_model=NotificationPreferencesOut)

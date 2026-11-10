@@ -32,6 +32,7 @@ def _booking_rule_values(db):
         "notify_email": rule.notify_email,
         "notify_in_app": rule.notify_in_app,
         "notify_zoho_cliq": rule.notify_zoho_cliq,
+        "zoho_enabled": rule.zoho_enabled,
         "approver_admin": rule.approver_admin,
         "approver_approver": rule.approver_approver,
     }
@@ -49,6 +50,8 @@ def _require_approver(db, current_user: User):
 
 
 def _decision_alert_recipients(db, event: str, booking_rules, booker_id: int):
+    if not booking_rules["zoho_enabled"]:
+        return []
     if not booking_rules["notify_zoho_cliq"]:
         return []
     if event == "pending":
@@ -351,7 +354,7 @@ def create_meeting(
     # Zoho Cliq Notification Trigger
     should_invite = getattr(meeting_in, "inviteCliq", False) or getattr(meeting_in, "invite_cliq", False)
 
-    if should_invite and not approval_required:
+    if should_invite and not approval_required and booking_rules["zoho_enabled"]:
         participants = getattr(meeting_in, "participants", []) or getattr(db_obj, "participants", [])
         
         meeting_date = getattr(db_obj, "meeting_date", "")
@@ -455,7 +458,7 @@ def approve_meeting(
         db.rollback()
         print(f"Failed to create approved in-app notification: {exc}")
 
-    if db_obj.invite_cliq:
+    if db_obj.invite_cliq and booking_rules["zoho_enabled"]:
         meeting_date = getattr(db_obj, "meeting_date", "")
         start_time_val = getattr(db_obj, "start_time", "")
         end_time_val = getattr(db_obj, "end_time", "")
