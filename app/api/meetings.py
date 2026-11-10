@@ -15,7 +15,8 @@ from app.models.user import User
 from app.schemas import meeting as meeting_schemas
 from app.api.settings import DEFAULTS
 # from app.utils.zoho_utils import send_meeting_webhook_notification
-from app.utils.zoho_sync import send_booking_decision_alert, send_zoho_notification
+from app.utils.zoho_sync import format_to_ampm, send_booking_decision_alert, send_zoho_notification
+from app.utils.email_notify import send_decision_email
 
 router = APIRouter(prefix="/meetings", tags=["meetings"])
 
@@ -189,6 +190,78 @@ def _create_inapp_notifications(db, event, meeting, recipients):
     db.commit()
 
 
+def _email_recipients(db, event, meeting):
+    from sqlalchemy import or_
+
+    booking_rules = _booking_rule_values(db)
+    if not booking_rules["notify_email"]:
+        return []
+    preference_gate = or_(
+        NotificationPreference.user_id.is_(None),
+        NotificationPreference.email_enabled.is_(True),
+    )
+    if event == "pending":
+        roles = []
+        if booking_rules["approver_admin"]:
+            roles.append("admin")
+        if booking_rules["approver_approver"]:
+            roles.append("approver")
+        if not roles:
+            return []
+        return (
+            db.query(User)
+            .outerjoin(NotificationPreference, NotificationPreference.user_id == User.id)
+            .filter(
+                User.is_active.is_(True),
+                User.role.in_(roles),
+                User.id != meeting.created_by,
+                preference_gate,
+            )
+            .all()
+        )
+
+    recipient = (
+        db.query(User)
+        .outerjoin(NotificationPreference, NotificationPreference.user_id == User.id)
+        .filter(User.id == meeting.created_by, preference_gate)
+        .first()
+    )
+    return [recipient] if recipient is not None else []
+
+
+def _queue_decision_email(
+    background_tasks,
+    event,
+    meeting,
+    recipients,
+    booker_name,
+    decider_name=None,
+):
+    if not recipients:
+        return
+    subject = {
+        "pending": f"Booking Awaiting Approval: {meeting.title}",
+        "approved": f"Booking Approved: {meeting.title}",
+        "rejected": f"Booking Rejected: {meeting.title}",
+    }[event]
+    room_name = meeting.room.name if meeting.room is not None else "Online"
+    start_ampm = format_to_ampm(meeting.start_time)
+    end_ampm = format_to_ampm(meeting.end_time)
+    if event == "pending":
+        detail = (
+            f"{meeting.title} · {meeting.meeting_date} · {start_ampm} - {end_ampm} · "
+            f"{room_name} · Booker: {booker_name}"
+        )
+    else:
+        detail = (
+            f"{meeting.title} · {meeting.meeting_date} · {start_ampm} - {end_ampm} · "
+            f"{room_name} · Decided by: {decider_name}"
+        )
+    body = f"{detail}\nOpen the app: https://meet.thehubmyanmar.com/"
+    for recipient in recipients:
+        background_tasks.add_task(send_decision_email, recipient.email, subject, body)
+
+
 def _enforce_working_hours(db, start_time, end_time):
     rule = db.query(BookingRule).filter(BookingRule.id == 1).first()
     work_start = rule.work_start if rule else time(9, 0)
@@ -263,6 +336,14 @@ def create_meeting(
         try:
             inapp_recipients = _inapp_recipients(db, "pending", db_obj)
             _create_inapp_notifications(db, "pending", db_obj, inapp_recipients)
+            email_recipients = _email_recipients(db, "pending", db_obj)
+            _queue_decision_email(
+                background_tasks,
+                "pending",
+                db_obj,
+                email_recipients,
+                booker_name=current_user.name,
+            )
         except Exception as exc:
             db.rollback()
             print(f"Failed to create pending in-app notifications: {exc}")
@@ -361,6 +442,15 @@ def approve_meeting(
     try:
         inapp_recipients = _inapp_recipients(db, "approved", db_obj)
         _create_inapp_notifications(db, "approved", db_obj, inapp_recipients)
+        email_recipients = _email_recipients(db, "approved", db_obj)
+        _queue_decision_email(
+            background_tasks,
+            "approved",
+            db_obj,
+            email_recipients,
+            booker_name=db_obj.creator.name,
+            decider_name=current_user.name,
+        )
     except Exception as exc:
         db.rollback()
         print(f"Failed to create approved in-app notification: {exc}")
@@ -415,6 +505,15 @@ def reject_meeting(
     try:
         inapp_recipients = _inapp_recipients(db, "rejected", db_obj)
         _create_inapp_notifications(db, "rejected", db_obj, inapp_recipients)
+        email_recipients = _email_recipients(db, "rejected", db_obj)
+        _queue_decision_email(
+            background_tasks,
+            "rejected",
+            db_obj,
+            email_recipients,
+            booker_name=db_obj.creator.name,
+            decider_name=current_user.name,
+        )
     except Exception as exc:
         db.rollback()
         print(f"Failed to create rejected in-app notification: {exc}")
