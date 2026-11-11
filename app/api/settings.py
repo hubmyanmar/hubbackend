@@ -1,4 +1,5 @@
 import re
+import logging
 from datetime import time
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -16,9 +17,12 @@ from app.schemas.booking_rule import (
     NotificationPreferencesUpdate,
     MeetingRecordsRetention,
     MeetingRecordsRetentionUpdate,
+    MeetingRecordsSettingsOut,
 )
+from app.services import s3_multipart
 
 router = APIRouter(prefix="/settings", tags=["Settings"])
+logger = logging.getLogger(__name__)
 
 DEFAULTS = {
     "approval_required": True,
@@ -140,13 +144,24 @@ def update_calendar_integrations(
     return {"zoho_enabled": rule.zoho_enabled}
 
 
-@router.get("/meeting-records", response_model=MeetingRecordsRetention)
+@router.get("/meeting-records", response_model=MeetingRecordsSettingsOut)
 def read_meeting_records_retention(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
     rule = db.query(BookingRule).filter(BookingRule.id == 1).first()
-    return {"retention_days": rule.retention_days if rule is not None else 90}
+    retention_days = rule.retention_days if rule is not None else 90
+    storage_bytes = None
+    try:
+        paginator = s3_multipart._client().get_paginator("list_objects_v2")
+        storage_bytes = sum(
+            item["Size"]
+            for page in paginator.paginate(Bucket=s3_multipart._bucket(), Prefix="audio/")
+            for item in page.get("Contents", [])
+        )
+    except Exception:
+        logger.exception("Failed to calculate recordings storage total from S3")
+    return {"retention_days": retention_days, "storage_bytes": storage_bytes}
 
 
 @router.put("/meeting-records", response_model=MeetingRecordsRetention)

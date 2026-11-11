@@ -33,6 +33,11 @@ class MeetingRecordsRetention(BaseModel):
     retention_days: Optional[int]
 
 
+class MeetingRecordsSettingsOut(BaseModel):
+    retention_days: Optional[int]
+    storage_bytes: Optional[int] = None
+
+
 class MeetingRecordsRetentionUpdate(BaseModel):
     retention_days: Optional[int]
 
