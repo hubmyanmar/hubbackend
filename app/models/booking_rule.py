@@ -14,6 +14,7 @@ class BookingRule(Base):
     notify_in_app = Column(Boolean, nullable=False, server_default="true")
     notify_zoho_cliq = Column(Boolean, nullable=False, server_default="true")
     zoho_enabled = Column(Boolean, nullable=False, server_default="true")
+    retention_days = Column(Integer, nullable=True)
     approver_admin = Column(Boolean, nullable=False, server_default="true")
     approver_approver = Column(Boolean, nullable=False, server_default="true")
     created_at = Column(DateTime(timezone=True), server_default=func.now())

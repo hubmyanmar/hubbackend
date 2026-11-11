@@ -14,6 +14,8 @@ from app.schemas.booking_rule import (
     BookingRulesUpdate,
     NotificationPreferencesOut,
     NotificationPreferencesUpdate,
+    MeetingRecordsRetention,
+    MeetingRecordsRetentionUpdate,
 )
 
 router = APIRouter(prefix="/settings", tags=["Settings"])
@@ -136,6 +138,35 @@ def update_calendar_integrations(
     db.commit()
     db.refresh(rule)
     return {"zoho_enabled": rule.zoho_enabled}
+
+
+@router.get("/meeting-records", response_model=MeetingRecordsRetention)
+def read_meeting_records_retention(
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    rule = db.query(BookingRule).filter(BookingRule.id == 1).first()
+    return {"retention_days": rule.retention_days if rule is not None else 90}
+
+
+@router.put("/meeting-records", response_model=MeetingRecordsRetention)
+def update_meeting_records_retention(
+    retention_in: MeetingRecordsRetentionUpdate,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_admin),
+):
+    if retention_in.retention_days not in (30, 90, 180, None):
+        raise HTTPException(status_code=400, detail="retention_days must be 30, 90, 180, or null")
+
+    rule = db.query(BookingRule).filter(BookingRule.id == 1).first()
+    if rule is None:
+        rule = BookingRule(id=1)
+        db.add(rule)
+
+    rule.retention_days = retention_in.retention_days
+    db.commit()
+    db.refresh(rule)
+    return {"retention_days": rule.retention_days}
 
 
 @router.get("/notification-preferences", response_model=NotificationPreferencesOut)

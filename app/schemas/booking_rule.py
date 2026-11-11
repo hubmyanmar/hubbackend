@@ -1,3 +1,5 @@
+from typing import Optional
+
 from pydantic import BaseModel
 
 
@@ -25,6 +27,14 @@ class BookingRulesUpdate(BaseModel):
 
 class CalendarIntegrationsUpdate(BaseModel):
     zoho_enabled: bool
+
+
+class MeetingRecordsRetention(BaseModel):
+    retention_days: Optional[int]
+
+
+class MeetingRecordsRetentionUpdate(BaseModel):
+    retention_days: Optional[int]
 
 
 class NotificationPreferencesUpdate(BaseModel):
