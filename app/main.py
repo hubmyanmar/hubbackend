@@ -1,5 +1,7 @@
 
 import os
+import asyncio
+from contextlib import asynccontextmanager
 from typing import Any, Optional
 
 import httpx
@@ -13,8 +15,23 @@ load_dotenv()
 from app.api.v1.router import api_router
 from app.api.settings import router as settings_router
 from app.core.security import get_current_user
+from app.services.retention_cleanup import retention_cleanup_loop
 
-app = FastAPI(title="Minutemind Backend")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    cleanup_task = asyncio.create_task(retention_cleanup_loop())
+    try:
+        yield
+    finally:
+        cleanup_task.cancel()
+        try:
+            await cleanup_task
+        except asyncio.CancelledError:
+            pass
+
+
+app = FastAPI(title="Minutemind Backend", lifespan=lifespan)
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
