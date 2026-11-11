@@ -171,6 +171,6 @@ async def zoho_callback(code: Optional[str] = None):
                 "message": f"Zoho authorization failed with status {response.status_code}: {response.text[:500]}",
             }
         tokens = response.json()
-        return {"status": "success", "tokens": tokens}
+        return {"status": "connected"}
     except Exception as exc:
         return {"status": "error", "message": str(exc)}
