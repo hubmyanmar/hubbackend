@@ -28,6 +28,10 @@ def _normalize_assignee_name(name: str) -> str:
     return " ".join(name.split()).casefold()
 
 
+def _bare_assignee_name(name: str) -> str:
+    return name.split(" - ", 1)[0].strip()
+
+
 class TranslationValidationRoute(APIRoute):
     """Log request validation errors without including submitted audio URLs."""
 
@@ -129,21 +133,24 @@ def _process_meeting_audio(
         record.summary = analysis["summary"]
         record.decisions = analysis["decisions"]
         db.query(ActionItem).filter(ActionItem.meeting_id == meeting_id).delete(synchronize_session=False)
-        allowed_names = {
-            name
+        participant_names = {
+            _bare_assignee_name(name)
+            for participant in db.query(MeetingParticipant).filter(MeetingParticipant.meeting_id == meeting_id).all()
+            if isinstance((name := participant.name), str) and _bare_assignee_name(name)
+        }
+        zoho_names = {
+            _bare_assignee_name(name)
             for user in get_allowed_users()
             if isinstance(user, dict)
             and isinstance((name := user.get("name")), str)
-            and name.strip()
+            and _bare_assignee_name(name)
         }
-        allowed_names.update(
-            name
-            for participant in db.query(MeetingParticipant).filter(MeetingParticipant.meeting_id == meeting_id).all()
-            if isinstance((name := participant.name), str) and name.strip()
-        )
-        names_by_normalized = {}
-        for name in allowed_names:
-            names_by_normalized.setdefault(_normalize_assignee_name(name), []).append(name)
+        participant_names_by_normalized = {}
+        for name in participant_names:
+            participant_names_by_normalized.setdefault(_normalize_assignee_name(name), set()).add(name)
+        zoho_names_by_normalized = {}
+        for name in zoho_names:
+            zoho_names_by_normalized.setdefault(_normalize_assignee_name(name), set()).add(name)
         for item in analysis["action_items"]:
             deadline = item["deadline"]
             due_date = None
@@ -156,8 +163,15 @@ def _process_meeting_audio(
             if not isinstance(raw_assignee, str) or not raw_assignee.strip():
                 owner_name = "မသတ်မှတ်ရသေး"
             else:
-                matches = names_by_normalized.get(_normalize_assignee_name(raw_assignee), [])
-                owner_name = matches[0] if len(matches) == 1 else "မသတ်မှတ်ရသေး"
+                normalized_assignee = _normalize_assignee_name(raw_assignee)
+                participant_matches = participant_names_by_normalized.get(normalized_assignee, set())
+                if len(participant_matches) == 1:
+                    owner_name = next(iter(participant_matches))
+                elif participant_matches:
+                    owner_name = "မသတ်မှတ်ရသေး"
+                else:
+                    zoho_matches = zoho_names_by_normalized.get(normalized_assignee, set())
+                    owner_name = next(iter(zoho_matches)) if len(zoho_matches) == 1 else "မသတ်မှတ်ရသေး"
             db.add(ActionItem(
                 meeting_id=meeting_id,
                 task=item["task"],
