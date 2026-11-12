@@ -29,7 +29,8 @@ def _normalize_assignee_name(name: str) -> str:
 
 
 def _bare_assignee_name(name: str) -> str:
-    return name.split(" - ", 1)[0].strip()
+    separators = [position for separator in ("-", "(") if (position := name.find(separator)) != -1]
+    return name[:min(separators)].strip() if separators else name.strip()
 
 
 class TranslationValidationRoute(APIRoute):
