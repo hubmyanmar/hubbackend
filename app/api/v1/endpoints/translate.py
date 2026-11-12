@@ -11,8 +11,10 @@ from sqlalchemy.orm import Session
 
 from app.core.database import SessionLocal, get_db
 from app.core.security import get_current_user
+from app.api.v1.endpoints.auth import get_allowed_users
 from app.models.action_item import ActionItem, ActionItemStatus
 from app.models.meeting import Meeting
+from app.models.meeting_participant import MeetingParticipant
 from app.models.meeting_record import MeetingRecord
 from app.models.user import User
 from app.schemas.translation import TranslationAccepted, TranslationRequest
@@ -20,6 +22,10 @@ from app.services import s3_multipart
 from app.services.audio_transcription import MAX_AUDIO_BYTES, transcribe_audio, transcribe_audio_file
 
 logger = logging.getLogger(__name__)
+
+
+def _normalize_assignee_name(name: str) -> str:
+    return " ".join(name.split()).casefold()
 
 
 class TranslationValidationRoute(APIRoute):
@@ -123,6 +129,21 @@ def _process_meeting_audio(
         record.summary = analysis["summary"]
         record.decisions = analysis["decisions"]
         db.query(ActionItem).filter(ActionItem.meeting_id == meeting_id).delete(synchronize_session=False)
+        allowed_names = {
+            name
+            for user in get_allowed_users()
+            if isinstance(user, dict)
+            and isinstance((name := user.get("name")), str)
+            and name.strip()
+        }
+        allowed_names.update(
+            name
+            for participant in db.query(MeetingParticipant).filter(MeetingParticipant.meeting_id == meeting_id).all()
+            if isinstance((name := participant.name), str) and name.strip()
+        )
+        names_by_normalized = {}
+        for name in allowed_names:
+            names_by_normalized.setdefault(_normalize_assignee_name(name), []).append(name)
         for item in analysis["action_items"]:
             deadline = item["deadline"]
             due_date = None
@@ -131,10 +152,16 @@ def _process_meeting_audio(
                     due_date = date.fromisoformat(deadline)
                 except ValueError:
                     pass
+            raw_assignee = item["assignee"]
+            if not isinstance(raw_assignee, str) or not raw_assignee.strip():
+                owner_name = "မသတ်မှတ်ရသေး"
+            else:
+                matches = names_by_normalized.get(_normalize_assignee_name(raw_assignee), [])
+                owner_name = matches[0] if len(matches) == 1 else "မသတ်မှတ်ရသေး"
             db.add(ActionItem(
                 meeting_id=meeting_id,
                 task=item["task"],
-                owner_name=item["assignee"] or "မသတ်မှတ်ရသေး",
+                owner_name=owner_name,
                 due_date=due_date,
                 status=ActionItemStatus.to_do,
             ))
