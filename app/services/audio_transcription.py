@@ -144,9 +144,12 @@ def transcribe_audio_file(audio_path: Path, meeting_date: date) -> dict:
                 )
                 chunk_text = _transcribe_audio_file(api_key, chunk_path, float(timeout_seconds))
                 if not isinstance(chunk_text, str) or not chunk_text.strip():
-                    raise AIServiceError("Whisper returned empty text")
+                    logger.warning("Whisper chunk %s/%s returned empty text; skipping chunk", index, len(chunk_paths))
+                    continue
                 transcript_chunks.append(chunk_text.strip())
                 logger.info("Whisper chunk %s/%s succeeded", index, len(chunk_paths))
+            if not transcript_chunks:
+                raise AIServiceError("Whisper returned empty text")
         transcript_text = "\n".join(transcript_chunks)
     except AIServiceError:
         raise
